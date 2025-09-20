@@ -88,6 +88,45 @@ app.post('/login', async (req, res) => {
   }
 });
 
+// UPDATE PROFILE
+app.put('/users/:id', async (req, res) => {
+  const { id } = req.params;
+  const username = req.body.username ?? null; // normalize undefined -> null
+  const email    = req.body.email ?? null;
+
+  if (username === null && email === null) {
+    return res.status(400).json({ success: false, error: 'Nothing to update' });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE users
+         SET username = COALESCE($1, username),
+             email    = COALESCE($2, email)
+       WHERE id = $3
+       RETURNING id, username, email, created_at`,
+      [username, email, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    return res.json({ success: true, user: result.rows[0] });
+  } catch (err) {
+    // Unique violation
+    if (err?.code === '23505') {
+      return res.status(400).json({ success: false, error: 'Username or email already exists' });
+    }
+    console.error('PUT /users/:id error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Server error' });
+  }
+});
+
+
+
+
+
 /**
  * START SERVER
  */

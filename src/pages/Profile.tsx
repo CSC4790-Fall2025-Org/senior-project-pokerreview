@@ -1,17 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 
 export const Profile: React.FC = () => {
-  const { user, logout } = useAuthStore();
+  const { user, logout, updateProfile, isLoading, error } = useAuthStore();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    console.log('=== PROFILE DEBUG ===');
+    console.log('User object:', user);
+    console.log('Username:', user?.username);
+    console.log('Email:', user?.email);
+    console.log('Created At:', user?.createdAt);
+    console.log('====================');
+  }, [user]);
+
   const [formData, setFormData] = useState({
     username: user?.username || '',
     email: user?.email || '',
   });
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        username: user.username || '',
+        email: user.email || '',
+      });
+    }
+  }, [user]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
@@ -20,10 +39,13 @@ export const Profile: React.FC = () => {
     }));
   };
 
-  const handleSave = () => {
-    // TODO: Implement profile update logic
-    console.log('Saving profile:', formData);
-    setIsEditing(false);
+  const handleSave = async () => {
+    const ok = await updateProfile({
+      username: formData.username !== user?.username ? formData.username : undefined,
+      email:    formData.email    !== user?.email    ? formData.email    : undefined,
+    });
+    // close edit mode only on success
+    if (ok) setIsEditing(false);
   };
 
   const handleCancel = () => {
