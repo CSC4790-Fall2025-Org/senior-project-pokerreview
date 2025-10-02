@@ -323,6 +323,9 @@ class PokerGame {
       case 'call':
         actionResult = this.playerCall(player);
         break;
+      case 'bet':
+        actionResult = this.playerBetAction(player, amount);
+        break;
       case 'raise':
         actionResult = this.playerRaise(player, amount);
         break;
@@ -368,15 +371,56 @@ class PokerGame {
     return { action: 'check' };
   }
 
+  playerBetAction(player, amount) {
+    // Validate this is actually a bet scenario (no current bet)
+    if (this.currentBet > 0) {
+      throw new Error('Cannot bet - there is already a bet. Use raise instead.');
+    }
+
+    // Minimum bet is big blind
+    const minBet = this.bigBlind;
+    if (amount < minBet) {
+      throw new Error(`Minimum bet is $${minBet}`);
+    }
+
+    if (player.chips < amount) {
+      throw new Error('Insufficient chips for bet');
+    }
+
+    const result = this.playerBet(this.players.indexOf(player), amount, 'bet');
+    this.currentBet = player.currentBet;
+
+    // Reset hasActed for all other players since there was a bet
+    this.players.forEach(p => {
+      if (p.id !== player.id && !p.isFolded && !p.isAllIn) {
+        p.hasActed = false;
+      }
+    });
+
+    return result;
+  }
+
   playerRaise(player, amount) {
+    // Validate this is actually a raise scenario (there is a current bet)
+    if (this.currentBet === 0) {
+      throw new Error('Cannot raise - no bet to raise. Use bet instead.');
+    }
+
     const callAmount = this.currentBet - player.currentBet;
-    const raiseAmount = Math.max(amount, this.bigBlind); // Minimum raise is big blind
-    const totalBet = callAmount + raiseAmount;
     
-    if (player.chips < totalBet) {
+    // Amount should be the TOTAL new bet, not just the raise amount
+    // Minimum raise is at least double the current bet
+    const minRaise = this.currentBet * 2;
+    
+    if (amount < minRaise) {
+      throw new Error(`Minimum raise is to $${minRaise}`);
+    }
+    
+    if (player.chips < amount) {
       throw new Error('Insufficient chips for raise');
     }
     
+    const totalBet = amount - player.currentBet;
     const result = this.playerBet(this.players.indexOf(player), totalBet, 'raise');
     this.currentBet = player.currentBet;
     

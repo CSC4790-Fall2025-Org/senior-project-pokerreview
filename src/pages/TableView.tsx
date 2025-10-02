@@ -293,6 +293,10 @@ export const TableView: React.FC = () => {
   const handleCheck = () => handlePlayerAction('check');
   const handleCall = () => handlePlayerAction('call');
   const handleAllIn = () => handlePlayerAction('all-in');
+  const handleBet = async (amount: number) => {
+    setShowRaiseModal(false);
+    await handlePlayerAction('bet', amount);
+  };
   const handleRaise = async (amount: number) => {
     setShowRaiseModal(false);
     await handlePlayerAction('raise', amount);
@@ -381,6 +385,7 @@ export const TableView: React.FC = () => {
   const currentBet = table.players.reduce((max, p) => Math.max(max, p.currentBet || 0), 0);
   const callAmount = currentBet - (myPlayer?.currentBet || 0);
   const canCheck = callAmount === 0;
+  const isFacingBet = currentBet > 0; // Is there any bet in this round?
   const minRaise = Math.max(table.bigBlind, currentBet * 2);
 
   return (
@@ -640,41 +645,57 @@ export const TableView: React.FC = () => {
                       {isActionLoading ? '...' : 'Fold'}
                     </Button>
                     
-                    {canCheck ? (
-                      <Button
-                        onClick={handleCheck}
-                        disabled={isActionLoading}
-                        variant="secondary"
-                        className="bg-blue-600 hover:bg-blue-700 min-w-20"
-                      >
-                        {isActionLoading ? '...' : 'Check'}
-                      </Button>
+                    {isFacingBet ? (
+                      // Facing aggression: Check/Call or Raise
+                      <>
+                        {callAmount === 0 ? (
+                          <Button
+                            onClick={handleCheck}
+                            disabled={isActionLoading}
+                            variant="secondary"
+                            className="bg-blue-600 hover:bg-blue-700 min-w-20"
+                          >
+                            {isActionLoading ? '...' : 'Check'}
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={handleCall}
+                            disabled={isActionLoading || callAmount > (myPlayer?.chips || 0)}
+                            className="bg-green-600 hover:bg-green-700 min-w-20"
+                          >
+                            {isActionLoading ? '...' : `Call ${formatCurrency(callAmount)}`}
+                          </Button>
+                        )}
+                        
+                        <Button
+                          onClick={() => setShowRaiseModal(true)}
+                          disabled={isActionLoading || (myPlayer?.chips || 0) <= callAmount}
+                          className="bg-orange-600 hover:bg-orange-700 min-w-20"
+                        >
+                          Raise
+                        </Button>
+                      </>
                     ) : (
-                      <Button
-                        onClick={handleCall}
-                        disabled={isActionLoading || callAmount > (myPlayer?.chips || 0)}
-                        className="bg-green-600 hover:bg-green-700 min-w-20"
-                      >
-                        {isActionLoading ? '...' : `Call ${formatCurrency(callAmount)}`}
-                      </Button>
+                      // No aggression: Check or Bet
+                      <>
+                        <Button
+                          onClick={handleCheck}
+                          disabled={isActionLoading}
+                          variant="secondary"
+                          className="bg-blue-600 hover:bg-blue-700 min-w-20"
+                        >
+                          {isActionLoading ? '...' : 'Check'}
+                        </Button>
+                        
+                        <Button
+                          onClick={() => setShowRaiseModal(true)}
+                          disabled={isActionLoading || (myPlayer?.chips || 0) === 0}
+                          className="bg-orange-600 hover:bg-orange-700 min-w-20"
+                        >
+                          Bet
+                        </Button>
+                      </>
                     )}
-                    
-                    <Button
-                      onClick={() => setShowRaiseModal(true)}
-                      disabled={isActionLoading || (myPlayer?.chips || 0) < minRaise}
-                      className="bg-orange-600 hover:bg-orange-700 min-w-20"
-                    >
-                      Raise
-                    </Button>
-                    
-                    <Button
-                      onClick={handleAllIn}
-                      disabled={isActionLoading || (myPlayer?.chips || 0) === 0}
-                      variant="secondary"
-                      className="bg-purple-600 hover:bg-purple-700 min-w-20"
-                    >
-                      All-In
-                    </Button>
                   </div>
                 ) : (
                   <div className="text-center text-gray-400 py-4">
@@ -684,12 +705,14 @@ export const TableView: React.FC = () => {
               </div>
             )}
 
-            {/* Raise Modal */}
+            {/* Bet/Raise Modal */}
             {showRaiseModal && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                 <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold text-white">Raise Amount</h2>
+                    <h2 className="text-xl font-bold text-white">
+                      {isFacingBet ? 'Raise Amount' : 'Bet Amount'}
+                    </h2>
                     <button
                       onClick={() => setShowRaiseModal(false)}
                       className="text-gray-400 hover:text-white text-2xl"
@@ -700,13 +723,13 @@ export const TableView: React.FC = () => {
 
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Raise to:
+                      {isFacingBet ? 'Raise to:' : 'Bet amount:'}
                     </label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">$</span>
                       <input
                         type="number"
-                        min={minRaise}
+                        min={isFacingBet ? minRaise : table.bigBlind}
                         max={myPlayer?.chips || 0}
                         step={table.bigBlind}
                         value={raiseAmount}
@@ -715,17 +738,17 @@ export const TableView: React.FC = () => {
                       />
                     </div>
                     <p className="text-sm text-gray-400 mt-1">
-                      Min: {formatCurrency(minRaise)} | Max: {formatCurrency(myPlayer?.chips || 0)}
+                      Min: {formatCurrency(isFacingBet ? minRaise : table.bigBlind)} | Max: {formatCurrency(myPlayer?.chips || 0)}
                     </p>
                   </div>
 
                   <div className="flex space-x-4">
                     <Button 
-                      onClick={() => handleRaise(raiseAmount)}
-                      disabled={raiseAmount < minRaise || raiseAmount > (myPlayer?.chips || 0)}
+                      onClick={() => isFacingBet ? handleRaise(raiseAmount) : handleBet(raiseAmount)}
+                      disabled={raiseAmount < (isFacingBet ? minRaise : table.bigBlind) || raiseAmount > (myPlayer?.chips || 0)}
                       className="flex-1"
                     >
-                      Raise to {formatCurrency(raiseAmount)}
+                      {isFacingBet ? `Raise to ${formatCurrency(raiseAmount)}` : `Bet ${formatCurrency(raiseAmount)}`}
                     </Button>
                     <Button 
                       variant="secondary" 

@@ -257,7 +257,7 @@ class TableController {
         });
       }
       
-      const validActions = ['fold', 'call', 'raise', 'check', 'all-in'];
+      const validActions = ['fold', 'call', 'bet', 'raise', 'check'];
       if (!validActions.includes(action)) {
         return res.status(400).json({
           success: false,
@@ -265,7 +265,7 @@ class TableController {
         });
       }
       
-      if (action === 'raise' && (!amount || amount <= 0)) {
+      if ((action === 'raise' || action === 'bet') && (!amount || amount <= 0)) {
         return res.status(400).json({
           success: false,
           error: 'Raise amount is required'
