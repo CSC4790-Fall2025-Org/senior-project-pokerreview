@@ -1,7 +1,7 @@
 NOTES WHILE PLAYING:
 
-all logic (BESIDES FOLDING) pre-flop works correctly
-
+betting post flop (after first 3 cards come out) is viewed as invalid action (check/fold work fine)
+- had something to do with player IDs not being consistent between str and int
 
 Maybe scroll wheel for betting/raising instead of ^ down option
 
