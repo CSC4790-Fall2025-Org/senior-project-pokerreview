@@ -1,0 +1,18 @@
+NOTES WHILE PLAYING:
+
+all logic (BESIDES FOLDING) pre-flop works correctly
+
+
+Maybe scroll wheel for betting/raising instead of ^ down option
+
+Delay after hand finishes “FINISHED” seems weird. Animation pushing chips to other player, stating who wins, show 5 card best hand
+
+Should have the ability to click on the seat to choose ur seat. Not just randomized by “join as player” button
+
+How to handle user getting stacked? No option to rebuy at same seat. Heads up, just ends.
+
+Leave table, doesn’t work. If I rejoin the table its as if I Never left.
+
+Own modal for raise (don’t let opponents / your cards appear)
+
+Border on images
