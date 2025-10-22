@@ -26,15 +26,15 @@ const validateJoinAsPlayer = [
 
 const validatePlayerAction = [
   body('action')
-    .isIn(['fold', 'call', 'raise', 'check', 'all-in'])
+    .isIn(['fold', 'call', 'bet', 'raise', 'check', 'all-in']) // FIXED: Added 'bet'!
     .withMessage('Invalid action'),
   body('amount')
     .optional()
     .isNumeric()
     .withMessage('Amount must be a number')
     .custom((value, { req }) => {
-      if (req.body.action === 'raise' && (!value || value <= 0)) {
-        throw new Error('Raise amount must be greater than 0');
+      if ((req.body.action === 'raise' || req.body.action === 'bet') && (!value || value <= 0)) {
+        throw new Error('Bet/Raise amount must be greater than 0');
       }
       return true;
     }),
@@ -43,6 +43,7 @@ const validatePlayerAction = [
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    console.log('❌ Validation errors:', errors.array());
     return res.status(400).json({
       success: false,
       error: errors.array()[0].msg

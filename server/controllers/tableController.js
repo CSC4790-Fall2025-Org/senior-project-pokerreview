@@ -1,4 +1,4 @@
-// server/controllers/tableController.js - WITH GAME ACTIONS
+// server/controllers/tableController.js - WITH DEBUG LOGGING
 console.log('🔧 DEBUG: Loading tableController.js');
 const TableService = require('../services/tableService');
 
@@ -6,6 +6,103 @@ console.log('🔧 DEBUG: TableService loaded:', typeof TableService);
 console.log('🔧 DEBUG: TableService.getActiveTables:', typeof TableService.getActiveTables);
 
 class TableController {
+  // Add a logging middleware method
+  static logRequest(req, res, next) {
+    console.log('=== INCOMING REQUEST ===');
+    console.log('Method:', req.method);
+    console.log('URL:', req.url);
+    console.log('Params:', req.params);
+    console.log('Body:', req.body);
+    console.log('Headers:', req.headers);
+    console.log('========================');
+    next();
+  }
+
+  // Player game action (fold, call, raise, check, all-in)
+  static async playerAction(req, res) {
+    console.log('🎮 === TableController.playerAction STARTED ===');
+    try {
+      const { tableId } = req.params;
+      const { action, amount } = req.body;
+      
+      console.log('=== TableController.playerAction called ===');
+      console.log('Raw request body:', JSON.stringify(req.body));
+      console.log('tableId:', tableId);
+      console.log('userId:', req.user?.userId || 'NO USER');
+      console.log('action value:', action);
+      console.log('action type:', typeof action);
+      console.log('action length:', action ? action.length : 'null');
+      console.log('action charCodes:', action ? Array.from(action).map(c => c.charCodeAt(0)) : 'null');
+      console.log('amount:', amount, 'type:', typeof amount);
+      
+      if (!action) {
+        return res.status(400).json({
+          success: false,
+          error: 'Action is required'
+        });
+      }
+      
+      // Trim and lowercase the action
+      const trimmedAction = String(action).trim().toLowerCase();
+      console.log('trimmedAction:', trimmedAction);
+      console.log('trimmedAction length:', trimmedAction.length);
+      
+      const validActions = ['fold', 'call', 'bet', 'raise', 'check', 'all-in'];
+      console.log('Valid actions:', validActions);
+      console.log('Is action valid?', validActions.includes(trimmedAction));
+      
+      if (!validActions.includes(trimmedAction)) {
+        console.error(`❌ INVALID ACTION RECEIVED`);
+        console.error(`Received: "${action}" (type: ${typeof action})`);
+        console.error(`Trimmed: "${trimmedAction}"`);
+        console.error(`Expected one of: ${validActions.join(', ')}`);
+        
+        return res.status(400).json({
+          success: false,
+          error: `Invalid action: "${action}". Valid actions are: ${validActions.join(', ')}`
+        });
+      }
+      
+      if ((trimmedAction === 'raise' || trimmedAction === 'bet') && (!amount || amount <= 0)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Raise/bet amount is required and must be greater than 0'
+        });
+      }
+      
+      console.log('✅ Action validated, calling TableService...');
+      
+      const result = TableService.playerAction(
+        tableId,
+        req.user.userId.toString(),
+        trimmedAction,
+        amount
+      );
+      
+      console.log('TableService result:', result);
+      
+      if (!result.success) {
+        return res.status(400).json({
+          success: false,
+          error: result.error
+        });
+      }
+      
+      res.json({
+        success: true,
+        message: `Action ${trimmedAction} successful`,
+        gameState: result.gameState
+      });
+    } catch (error) {
+      console.error('❌ Player action error:', error);
+      console.error('Error stack:', error.stack);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to process player action: ' + error.message
+      });
+    }
+  }
+
   // Get all active tables for dashboard
   static async getTables(req, res) {
     try {
@@ -13,7 +110,6 @@ class TableController {
       
       const tables = TableService.getActiveTables();
       
-      // Transform tables for frontend display
       const displayTables = tables.map(table => ({
         id: table.id,
         templateId: table.templateId,
@@ -71,18 +167,9 @@ class TableController {
         });
       }
       
-      // Check if user is player or spectator
       const userId = req.user.userId.toString();
       const isPlayer = table.players.some(p => p.id === userId);
       const isSpectator = table.spectators.some(s => s.id === userId);
-
-      console.log('=== TABLE DEBUG ===');
-      console.log('table.currentPlayer:', table.currentPlayer);
-      console.log('requesting userId:', userId);
-      console.log('table.players:', table.players.map(p => ({ id: p.id, username: p.username })));
-      console.log('table.gamePhase:', table.gamePhase);
-      console.log('table.status:', table.status);
-      console.log('==================');
       
       const response = {
         id: table.id,
@@ -99,6 +186,7 @@ class TableController {
         gamePhase: table.gamePhase,
         dealerPosition: table.dealerPosition,
         currentPlayer: table.currentPlayer,
+        lastRaiseAmount: table.lastRaiseAmount || 0, // Include last raise amount
         players: table.players.map(player => ({
           id: player.id,
           username: player.username,
@@ -114,7 +202,6 @@ class TableController {
           currentBet: player.currentBet,
           isFolded: player.isFolded,
           isAllIn: player.isAllIn,
-          // Only show cards to the player themselves
           cards: player.id === userId ? (player.cards || []) : []
         })),
         spectators: table.spectators.map(spec => ({
@@ -129,9 +216,6 @@ class TableController {
         lastActivity: table.lastActivity
       };
 
-      console.log('=== RESPONSE DEBUG ===');
-      console.log('response.currentPlayer:', response.currentPlayer);
-      console.log('====================');
       res.json({
         success: true,
         table: response
@@ -200,14 +284,14 @@ class TableController {
       }
       
       const result = TableService.joinAsPlayer(
-      tableId, 
-      {
-        id: req.user.userId.toString(), // Ensure string
-        username: req.user.username,
-        avatar_url: req.user.avatar_url
-      },
-      buyInAmount
-    );
+        tableId, 
+        {
+          id: req.user.userId.toString(),
+          username: req.user.username,
+          avatar_url: req.user.avatar_url
+        },
+        buyInAmount
+      );
       
       if (!result.success) {
         return res.status(400).json({
@@ -216,7 +300,6 @@ class TableController {
         });
       }
       
-      // Check if table is now full and create duplicate
       const table = TableService.getTable(tableId);
       if (table && table.players.length >= table.maxPlayers) {
         console.log('Table is full, creating duplicate...');
@@ -233,69 +316,6 @@ class TableController {
       res.status(500).json({
         success: false,
         error: 'Failed to join table as player'
-      });
-    }
-  }
-
-  // Player game action (fold, call, raise, check, all-in)
-  static async playerAction(req, res) {
-    try {
-      const { tableId } = req.params;
-      const { action, amount } = req.body;
-      
-      console.log('=== TableController.playerAction called ===', { 
-        tableId, 
-        userId: req.user.userId,
-        action,
-        amount
-      });
-      
-      if (!action) {
-        return res.status(400).json({
-          success: false,
-          error: 'Action is required'
-        });
-      }
-      
-      const validActions = ['fold', 'call', 'bet', 'raise', 'check'];
-      if (!validActions.includes(action)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid action'
-        });
-      }
-      
-      if ((action === 'raise' || action === 'bet') && (!amount || amount <= 0)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Raise amount is required'
-        });
-      }
-      
-      const result = TableService.playerAction(
-        tableId,
-        req.user.userId.toString(), // Ensure string
-        action,
-        amount
-      );
-      
-      if (!result.success) {
-        return res.status(400).json({
-          success: false,
-          error: result.error
-        });
-      }
-      
-      res.json({
-        success: true,
-        message: `Action ${action} successful`,
-        gameState: result.gameState
-      });
-    } catch (error) {
-      console.error('Player action error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to process player action'
       });
     }
   }
