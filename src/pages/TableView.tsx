@@ -194,10 +194,10 @@ export const TableView: React.FC = () => {
     }
   }, [table?.gamePhase]);
 
-  // NEW: action state
+  //action state
   const [isActionLoading, setIsActionLoading] = useState(false);
-  const [raiseAmount, setRaiseAmount] = useState(table?.bigBlind || 20);
   const [showRaiseModal, setShowRaiseModal] = useState(false);
+  const [raiseAmount, setRaiseAmount] = useState(20);
 
   // Load table data
   useEffect(() => {
@@ -385,9 +385,14 @@ export const TableView: React.FC = () => {
   const currentBet = table.players.reduce((max, p) => Math.max(max, p.currentBet || 0), 0);
   const callAmount = currentBet - (myPlayer?.currentBet || 0);
   const canCheck = callAmount === 0;
-  const isFacingBet = currentBet > 0; // Is there any bet in this round?
-  const minRaise = Math.max(table.bigBlind, currentBet * 2);
-
+  const isFacingBet = currentBet > 0;
+  
+  // Calculate minimum raise properly using lastRaiseAmount from backend
+  const minRaiseIncrement = (table.lastRaiseAmount && table.lastRaiseAmount > 0) 
+    ? table.lastRaiseAmount 
+    : table.bigBlind;
+  const minRaise = currentBet + minRaiseIncrement;
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       {/* Header */}
@@ -668,7 +673,10 @@ export const TableView: React.FC = () => {
                         )}
                         
                         <Button
-                          onClick={() => setShowRaiseModal(true)}
+                          onClick={() => {
+                            setRaiseAmount(minRaise); // Set to minimum valid raise
+                            setShowRaiseModal(true);
+                          }}
                           disabled={isActionLoading || (myPlayer?.chips || 0) <= callAmount}
                           className="bg-orange-600 hover:bg-orange-700 min-w-20"
                         >
@@ -688,7 +696,10 @@ export const TableView: React.FC = () => {
                         </Button>
                         
                         <Button
-                          onClick={() => setShowRaiseModal(true)}
+                          onClick={() => {
+                            setRaiseAmount(table.bigBlind); // Set to minimum valid bet
+                            setShowRaiseModal(true);
+                          }}
                           disabled={isActionLoading || (myPlayer?.chips || 0) === 0}
                           className="bg-orange-600 hover:bg-orange-700 min-w-20"
                         >
@@ -740,6 +751,11 @@ export const TableView: React.FC = () => {
                     <p className="text-sm text-gray-400 mt-1">
                       Min: {formatCurrency(isFacingBet ? minRaise : table.bigBlind)} | Max: {formatCurrency(myPlayer?.chips || 0)}
                     </p>
+                    {isFacingBet && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        (Current bet: {formatCurrency(currentBet)} + Min raise: {formatCurrency(minRaiseIncrement)})
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex space-x-4">

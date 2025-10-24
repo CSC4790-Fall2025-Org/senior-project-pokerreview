@@ -41,6 +41,7 @@ export interface TableData {
   gamePhase: string;
   dealerPosition?: number;
   currentPlayer?: string;
+  lastRaiseAmount?: number;
   players: TablePlayer[];
   spectatorList?: TableSpectator[];
   communityCards: string[]; // Make this required, not optional
