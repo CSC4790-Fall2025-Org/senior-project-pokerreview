@@ -239,7 +239,10 @@ export const TableView: React.FC = () => {
       const response = await TableService.joinAsPlayer(tableId, buyInAmount);
       if (response.success) {
         setShowJoinModal(false);
-        await loadTable(); // Refresh table data
+        // ✅ Clear stale data and force fresh load
+        setTable(null);
+        setIsLoading(true);
+        await loadTable();
       } else {
         setError(response.error || 'Failed to join as player');
       }
@@ -248,9 +251,9 @@ export const TableView: React.FC = () => {
       console.error('Error joining as player:', err);
     } finally {
       setIsJoining(false);
+      setIsLoading(false);
     }
   };
-
   const handleLeaveTable = async () => {
     if (!tableId) return;
 
@@ -595,23 +598,27 @@ export const TableView: React.FC = () => {
                 );
               })}
               
-              {/* Empty seats */}
-              {Array.from({ length: table.maxPlayers - table.players.length }).map((_, index) => {
-                const position = table.players.length + index;
-                const { x, y } = getPlayerPosition(position, table.maxPlayers);
-                
-                return (
-                  <div
-                    key={`empty-${index}`}
-                    className="absolute transform -translate-x-1/2 -translate-y-1/2"
-                    style={{ left: `${x}%`, top: `${y}%` }}
-                  >
-                    <div className="w-16 h-16 rounded-full border-4 border-dashed border-gray-600 flex items-center justify-center hover:border-gray-500 transition-colors cursor-pointer">
-                      <span className="text-gray-500 text-2xl">+</span>
-                    </div>
+            {/* Empty seats - show at positions not occupied by players */}
+            {Array.from({ length: table.maxPlayers }).map((_, position) => {
+              // Check if this position is occupied by a player
+              const isOccupied = table.players.some(p => p.position === position);
+              
+              if (isOccupied) return null; // Skip occupied positions
+              
+              const { x, y } = getPlayerPosition(position, table.maxPlayers);
+              
+              return (
+                <div
+                  key={`empty-${position}`}
+                  className="absolute transform -translate-x-1/2 -translate-y-1/2"
+                  style={{ left: `${x}%`, top: `${y}%` }}
+                >
+                  <div className="w-16 h-16 rounded-full border-4 border-dashed border-gray-600 flex items-center justify-center hover:border-gray-500 transition-colors cursor-pointer">
+                    <span className="text-gray-500 text-2xl">+</span>
                   </div>
-                );
-              })}
+                </div>
+              );
+            })}
             </div>
 
             {/* NEW: Action Buttons */}

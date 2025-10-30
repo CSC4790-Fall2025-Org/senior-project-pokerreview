@@ -2,12 +2,15 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const path = require('path');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const tableRoutes = require('./routes/tables');
 require('dotenv').config();
 
 const app = express();
+
+app.set('trust proxy', 1); // behind Nginx/ALB
 
 // Security middleware
 app.use(helmet({
@@ -32,6 +35,9 @@ app.use(cors({
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+app.use((req,res,next)=>{ console.log('[REQ]', req.method, req.url); next(); });
+
 
 // DEBUG: Log all requests in development
 if (process.env.NODE_ENV !== 'production') {
@@ -59,28 +65,29 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Root endpoint
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Poker Platform API',
-    version: '1.0.0',
-    status: 'running'
+// ✅ Serve React build in production (single-port app)
+if (process.env.NODE_ENV === 'production') {
+  const buildPath = path.join(__dirname, '../build');
+  app.use(express.static(buildPath));
+
+  // Send React for any GET that isn't /api/*
+  app.get(/^\/(?!api\/).*/, (req, res) => {
+    res.sendFile(path.join(buildPath, 'index.html'));
   });
-});
+
+} else {
+  // Dev root
+  app.get('/', (req, res) => {
+    res.json({ message: 'Poker Platform API', version: '1.0.0', status: 'running' });
+  });
+}
 
 // Global error handling middleware
-app.use((error, req, res, next) => {
-  console.error('Unhandled error:', error);
-  
-  const message = process.env.NODE_ENV === 'production' 
-    ? 'Internal server error' 
-    : error.message;
-    
-  res.status(500).json({
-    success: false,
-    error: message
-  });
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ success:false, error: err.message, stack: err.stack });
 });
+
 
 // 404 handler - must be last
 app.use((req, res) => {

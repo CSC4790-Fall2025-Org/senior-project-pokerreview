@@ -59,7 +59,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
   },
 
-  // Initialize auth state from stored token on app start
   initializeAuth: async () => {
     set({ isLoading: true, error: null });
     

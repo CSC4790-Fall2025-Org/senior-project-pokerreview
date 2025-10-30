@@ -270,12 +270,19 @@ class TableController {
       const { tableId } = req.params;
       const { buyInAmount } = req.body;
       
-      console.log('=== TableController.joinAsPlayer called ===', { 
-        tableId, 
-        userId: req.user.userId,
-        buyInAmount 
-      });
+      console.log('=== JOIN AS PLAYER DEBUG ===');
+      console.log('tableId:', tableId);
+      console.log('buyInAmount:', buyInAmount);
+      console.log('req.user:', JSON.stringify(req.user, null, 2));     
       
+      const authHeader = req.headers['authorization'];
+      const token = authHeader && authHeader.split(' ')[1];
+      if (token) {
+        const jwt = require('jsonwebtoken');
+        const decoded = jwt.decode(token);
+        console.log('MANUALLY DECODED TOKEN:', JSON.stringify(decoded, null, 2));
+      }
+      console.log('============================');
       if (!buyInAmount || buyInAmount <= 0) {
         return res.status(400).json({
           success: false,

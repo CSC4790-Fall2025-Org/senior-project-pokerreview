@@ -1,9 +1,9 @@
 // src/services/api/table.ts - FIXED VERSION
 import { AuthService } from './auth';
 
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://your-backend.railway.app' 
-  : 'http://localhost:3001';
+// Same-origin in prod; explicit URL only for dev
+const API_BASE_URL =
+  process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001';
 
 export interface TablePlayer {
   id: string;

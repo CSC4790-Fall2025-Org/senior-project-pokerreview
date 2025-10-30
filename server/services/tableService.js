@@ -151,7 +151,14 @@ class TableService {
           currentPlayer: gameState.currentPlayer,
           players: table.players.map(player => {
             const gamePlayer = gameState.players.find(gp => gp.id === player.id);
-            return gamePlayer ? { ...player, ...gamePlayer } : player;
+            if (gamePlayer) {
+              return {
+                ...player,
+                ...gamePlayer,
+                position: player.position, // ✅ Preserve table position
+              };
+            }
+            return player;
           })
         };
       }
@@ -169,7 +176,6 @@ class TableService {
     if (game) {
       const gameState = game.getGameState();
       
-      // *** ADD DEBUG LOGGING ***
       console.log('=== TABLE SERVICE DEBUG ===');
       console.log('gameState.currentPlayer:', gameState.currentPlayer);
       console.log('gameState.players:', gameState.players.map(p => ({ id: p.id, username: p.username })));
@@ -180,13 +186,16 @@ class TableService {
         currentPot: gameState.pot,
         communityCards: gameState.communityCards,
         gamePhase: gameState.gamePhase,
-        currentPlayer: gameState.currentPlayer, // This should be the player ID from game engine
+        currentPlayer: gameState.currentPlayer,
         dealerPosition: gameState.dealerPosition,
         players: table.players.map(player => {
           const gamePlayer = gameState.players.find(gp => gp.id === player.id);
           if (gamePlayer) {
             return {
-              ...player,
+              id: player.id,
+              username: player.username,
+              avatar_url: player.avatar_url,
+              position: player.position, // ✅ CRITICAL: Use table's position
               chips: gamePlayer.chips,
               currentBet: gamePlayer.currentBet,
               isDealer: gamePlayer.isDealer,
@@ -196,7 +205,9 @@ class TableService {
               isAllIn: gamePlayer.isAllIn,
               hasActed: gamePlayer.hasActed,
               action: gamePlayer.action,
-              cards: gamePlayer.cards
+              cards: gamePlayer.cards,
+              isActive: player.isActive,
+              lastSeen: player.lastSeen
             };
           }
           return player;
@@ -206,7 +217,6 @@ class TableService {
     
     return table;
   }
-
   // Join as spectator
   static joinAsSpectator(tableId, user) {
     const table = this.activeTables.get(tableId);
@@ -246,7 +256,7 @@ class TableService {
     if (buyInAmount < table.buyInMin || buyInAmount > table.buyInMax) {
       return { 
         success: false, 
-        error: `Buy-in must be between $${table.buyInMin} and $${table.buyInMax}` 
+        error: `Buy-in must be between ${table.buyInMin} and ${table.buyInMax}` 
       };
     }
     
@@ -255,9 +265,11 @@ class TableService {
       return { success: false, error: 'Already playing at this table' };
     }
     
-    // Find available position
+    // Find available position - CRITICAL: Check which positions are taken
     const occupiedPositions = new Set(table.players.map(p => p.position));
-    let position = 0;
+    let position = -1;
+    
+    // Find first available position from 0 to maxPlayers-1
     for (let i = 0; i < table.maxPlayers; i++) {
       if (!occupiedPositions.has(i)) {
         position = i;
@@ -265,13 +277,17 @@ class TableService {
       }
     }
     
-    // Add player
+    if (position === -1) {
+      return { success: false, error: 'No available positions' };
+    }
+    
+    // Add player with the assigned position
     const player = {
       id: user.id,
       username: user.username,
       avatar_url: user.avatar_url,
       chips: buyInAmount,
-      position,
+      position, // This position will be preserved
       isActive: true,
       hasActed: false,
       lastSeen: new Date(),
@@ -290,11 +306,10 @@ class TableService {
     }
     
     table.lastActivity = new Date();
-    console.log(`User ${user.username} joined table ${table.name} as player with ${buyInAmount}`);
+    console.log(`User ${user.username} joined table ${table.name} as player at position ${position} with ${buyInAmount}`);
     
     return { success: true, position };
   }
-
   // Start a poker game
   static startGame(tableId) {
     const table = this.activeTables.get(tableId);
@@ -367,31 +382,76 @@ class TableService {
   }
 
   // Leave table
+// FIXED tableService.js - leaveTable method
+
   static leaveTable(tableId, userId) {
     const table = this.activeTables.get(tableId);
     if (!table) return false;
     
-    // Remove from players
-    const playerIndex = table.players.findIndex(p => p.id === userId);
+    // Convert userId to string for consistent comparison
+    const userIdStr = String(userId);
+    
+    console.log('=== LEAVE TABLE DEBUG ===');
+    console.log('User leaving:', userIdStr);
+    console.log('Before removal:');
+    console.log('Table players:', table.players.map(p => ({ id: p.id, username: p.username, position: p.position })));
+    
+    // Find the player
+    const playerIndex = table.players.findIndex(p => String(p.id) === userIdStr);
+    
     if (playerIndex !== -1) {
       const player = table.players[playerIndex];
-      console.log(`Player ${player.username} left table ${table.name}`);
+      console.log(`Player ${player.username} (ID: ${userIdStr}, Position: ${player.position}) leaving table ${table.name}`);
+      
+      // Get active game if it exists
+      const game = this.activeGames.get(tableId);
+      
+      // CRITICAL FIX: Remove from game engine FIRST, before touching table.players
+      if (game && table.status === 'active') {
+        console.log(`Removing player ${player.username} from active game engine`);
+        
+        try {
+          // Remove player from game engine BEFORE removing from table
+          game.removePlayer(userIdStr);
+        } catch (error) {
+          console.error('Error removing player from game engine:', error);
+        }
+      }
+      
+      // NOW remove player from table.players array
+      // This preserves the positions of remaining players
       table.players.splice(playerIndex, 1);
       
-      // If too few players, pause the game
+      console.log('After removal:');
+      console.log('Table players:', table.players.map(p => ({ id: p.id, username: p.username, position: p.position })));
+      console.log('========================');
+      
+      // Check if we still have enough players for the game
       if (table.players.length < 2 && table.status === 'active') {
+        console.log(`Not enough players remaining (${table.players.length}), ending game`);
         table.status = 'waiting';
         this.activeGames.delete(tableId);
+      } else if (game && table.players.length >= 2) {
+        // Game continues with remaining players
+        console.log(`Game continues with ${table.players.length} players`);
       }
     }
     
     // Remove from spectators
-    table.spectators = table.spectators.filter(s => s.id !== userId);
+    const spectatorIndex = table.spectators.findIndex(s => String(s.id) === userIdStr);
+    if (spectatorIndex !== -1) {
+      const spectator = table.spectators[spectatorIndex];
+      console.log(`Spectator ${spectator.username} (ID: ${userIdStr}) leaving table ${table.name}`);
+      table.spectators.splice(spectatorIndex, 1);
+    }
     
     table.lastActivity = new Date();
+    
+    console.log(`User ${userIdStr} successfully left table ${tableId}`);
+    console.log(`Table now has ${table.players.length} players and ${table.spectators.length} spectators`);
+    
     return true;
   }
-
   // Create duplicate table when one fills up
   static createDuplicateTable(templateId) {
     const template = this.TABLE_TEMPLATES.find(t => t.id === templateId);
