@@ -1,4 +1,5 @@
-// server/services/pokerEngine.js - FIXED FOLD LOGIC
+// server/services/pokerEngine.js - FIXED ALL-IN CALL AND RAISE LOGIC
+
 class Card {
   constructor(suit, rank) {
     this.suit = suit;
@@ -187,6 +188,7 @@ class PokerGame {
     this.pot = 0;
     this.sidePots = [];
     this.currentBet = 0;
+    this.lastRaiseAmount = 0;
     this.dealerPosition = 0;
     this.currentPlayerIndex = 0;
     this.gamePhase = 'preflop';
@@ -202,6 +204,7 @@ class PokerGame {
     this.pot = 0;
     this.sidePots = [];
     this.currentBet = 0;
+    this.lastRaiseAmount = 0;
     this.gamePhase = 'preflop';
     this.bettingRound = 0;
     
@@ -279,7 +282,6 @@ class PokerGame {
     }
   }
 
-  // CRITICAL FIX: Count active players properly
   getActivePlayers() {
     return this.players.filter(p => !p.isFolded && p.isActive);
   }
@@ -306,7 +308,6 @@ class PokerGame {
       throw new Error('Player not found');
     }
 
-    // String comparison for turn checking
     const currentPlayerId = String(currentPlayer.id);
     const actionPlayerId = String(playerId);
     
@@ -321,7 +322,6 @@ class PokerGame {
       throw new Error('Cannot act - player is folded or all-in');
     }
 
-    // Validate action is a valid poker action
     const validActions = ['fold', 'call', 'bet', 'raise', 'check', 'all-in'];
     if (!validActions.includes(action)) {
       throw new Error(`Invalid action: "${action}". Valid actions are: ${validActions.join(', ')}`);
@@ -357,7 +357,6 @@ class PokerGame {
     
     this.logAction(player.username, `${action}${amount ? ` $${amount}` : ''}`);
     
-    // CRITICAL FIX: Check if hand should end after this action
     this.advanceGame();
     
     return {
@@ -373,8 +372,18 @@ class PokerGame {
     return { action: 'fold' };
   }
 
+  // FIXED: Allow calling with all available chips, even if less than currentBet
   playerCall(player) {
     const callAmount = this.currentBet - player.currentBet;
+    
+    console.log(`🎲 CALL ATTEMPT: Player ${player.username} needs ${callAmount}, has ${player.chips}`);
+    
+    // If player doesn't have enough chips to match the full bet, they go all-in
+    if (callAmount >= player.chips) {
+      console.log(`💰 ${player.username} calling all-in with ${player.chips} (need ${callAmount})`);
+      return this.playerAllIn(player);
+    }
+    
     return this.playerBet(this.players.indexOf(player), callAmount, 'call');
   }
 
@@ -391,16 +400,23 @@ class PokerGame {
     }
 
     const minBet = this.bigBlind;
-    if (amount < minBet) {
+    if (amount < minBet && amount < player.chips) {
       throw new Error(`Minimum bet is $${minBet}`);
     }
 
-    if (player.chips < amount) {
-      throw new Error('Insufficient chips for bet');
+    // FIXED: If player tries to bet more than they have, make it an all-in
+    if (player.chips <= amount) {
+      console.log(`💰 ${player.username} betting all-in (tried ${amount}, has ${player.chips})`);
+      return this.playerAllIn(player);
     }
 
+    const previousBet = this.currentBet;
     const result = this.playerBet(this.players.indexOf(player), amount, 'bet');
+    
     this.currentBet = player.currentBet;
+    this.lastRaiseAmount = this.currentBet - previousBet;
+    
+    console.log(`✅ Bet complete: previousBet=${previousBet}, newBet=${this.currentBet}, lastRaiseAmount=${this.lastRaiseAmount}`);
 
     this.players.forEach(p => {
       if (p.id !== player.id && !p.isFolded && !p.isAllIn) {
@@ -412,23 +428,51 @@ class PokerGame {
   }
 
   playerRaise(player, amount) {
+    console.log('🎯 RAISE ATTEMPT:', {
+      attemptedAmount: amount,
+      currentBet: this.currentBet,
+      lastRaiseAmount: this.lastRaiseAmount,
+      playerCurrentBet: player.currentBet,
+      playerChips: player.chips
+    });
+    
     if (this.currentBet === 0) {
       throw new Error('Cannot raise - no bet to raise. Use bet instead.');
     }
 
-    const minRaise = this.currentBet * 2;
+    const previousBet = this.currentBet;
+    const minRaiseIncrement = this.lastRaiseAmount > 0 ? this.lastRaiseAmount : this.bigBlind;
+    const minRaise = this.currentBet + minRaiseIncrement;
+    
+    console.log('=== RAISE VALIDATION ===');
+    console.log('Previous bet (currentBet):', previousBet);
+    console.log('Player current bet BEFORE action:', player.currentBet);
+    console.log('Last raise amount:', this.lastRaiseAmount);
+    console.log('Min raise increment:', minRaiseIncrement);
+    console.log('Min raise total:', minRaise);
+    console.log('Attempted raise:', amount);
+    console.log('=======================');
+    
+    // Calculate how much more the player needs to put in
+    const totalBetNeeded = amount - player.currentBet;
+    
+    // FIXED: If player doesn't have enough for the full raise, convert to all-in
+    if (totalBetNeeded >= player.chips) {
+      console.log(`💰 ${player.username} raising all-in (tried ${amount}, only has ${player.chips} more)`);
+      return this.playerAllIn(player);
+    }
     
     if (amount < minRaise) {
-      throw new Error(`Minimum raise is to $${minRaise}`);
+      throw new Error(`Minimum raise is to $${minRaise} (current bet $${this.currentBet} + min raise $${minRaiseIncrement})`);
     }
     
-    if (player.chips < amount) {
-      throw new Error('Insufficient chips for raise');
-    }
+    const result = this.playerBet(this.players.indexOf(player), totalBetNeeded, 'raise');
     
-    const totalBet = amount - player.currentBet;
-    const result = this.playerBet(this.players.indexOf(player), totalBet, 'raise');
-    this.currentBet = player.currentBet;
+    const newTotalBet = player.currentBet;
+    this.lastRaiseAmount = newTotalBet - previousBet;
+    this.currentBet = newTotalBet;
+    
+    console.log(`✅ Raise complete: previousBet=${previousBet}, newBet=${this.currentBet}, raiseIncrement=${this.lastRaiseAmount}`);
     
     this.players.forEach(p => {
       if (p.id !== player.id && !p.isFolded && !p.isAllIn) {
@@ -441,16 +485,27 @@ class PokerGame {
 
   playerAllIn(player) {
     const allInAmount = player.chips;
+    const previousBet = this.currentBet;
+    
     const result = this.playerBet(this.players.indexOf(player), allInAmount, 'all-in');
     player.isAllIn = true;
     
-    if (player.currentBet > this.currentBet) {
+    // Only update currentBet and trigger re-action if this all-in raises the bet
+    if (player.currentBet > previousBet) {
+      const raiseAmount = player.currentBet - previousBet;
       this.currentBet = player.currentBet;
+      
+      // Only reset hasActed if the all-in is a meaningful raise
+      // (at least meets minimum raise requirement or is the player's last chips)
+      console.log(`💰 All-in raises bet from ${previousBet} to ${this.currentBet} (+${raiseAmount})`);
+      
       this.players.forEach(p => {
         if (p.id !== player.id && !p.isFolded && !p.isAllIn) {
           p.hasActed = false;
         }
       });
+    } else {
+      console.log(`💰 All-in for ${player.currentBet} (current bet is ${this.currentBet})`);
     }
     
     return result;
@@ -477,20 +532,16 @@ class PokerGame {
     };
   }
 
-  // CRITICAL FIX: Properly handle game advancement
   advanceGame() {
     const activePlayers = this.getActivePlayers();
     
-    // If only one player remains, they win immediately
     if (activePlayers.length === 1) {
       console.log('Only one player remaining, ending hand immediately');
       this.endHandEarly(activePlayers[0]);
       return;
     }
     
-    // Check if betting round is complete
     if (this.isBettingRoundComplete()) {
-      // Check if all remaining players are all-in (skip to showdown)
       const playersNotAllIn = activePlayers.filter(p => !p.isAllIn);
       if (playersNotAllIn.length <= 1) {
         console.log('All players all-in or only one can act, going to showdown');
@@ -505,20 +556,17 @@ class PokerGame {
     }
   }
 
-  // NEW: End hand early when everyone folds to one player
   endHandEarly(winner) {
     winner.chips += this.pot;
     this.logAction(winner.username, `wins $${this.pot} (all others folded)`);
     this.gamePhase = 'finished';
     
-    // Reset the game for next hand after a delay
     console.log(`Hand finished. Winner: ${winner.username}`);
   }
 
-  // NEW: Deal all remaining community cards at once when going to showdown
   dealRemainingCards() {
     while (this.communityCards.length < 5) {
-      this.deck.deal(1); // Burn card
+      this.deck.deal(1);
       this.communityCards.push(...this.deck.deal(1));
     }
     this.logAction('game', 'All community cards dealt');
@@ -590,6 +638,73 @@ class PokerGame {
     console.log(`Player removed. Remaining players: ${this.players.length}, Active: ${activePlayers.length}`);
   }
 
+  removePlayer(playerId) {
+    const playerIdStr = String(playerId);
+    const playerIndex = this.players.findIndex(p => String(p.id) === playerIdStr);
+    
+    if (playerIndex === -1) {
+      console.log(`Player ${playerIdStr} not found in game`);
+      return;
+    }
+    
+    const player = this.players[playerIndex];
+    console.log(`=== REMOVING PLAYER FROM GAME ===`);
+    console.log(`Player to remove: ${player.username} (ID: ${playerIdStr})`);
+    console.log(`Player index in game array: ${playerIndex}`);
+    console.log(`Current game players:`, this.players.map(p => ({ id: p.id, username: p.username })));
+    
+    // If it's this player's turn, automatically fold them and move to next player
+    if (this.currentPlayerIndex === playerIndex) {
+      console.log(`It was ${player.username}'s turn, auto-folding and moving to next player`);
+      player.isFolded = true;
+      player.isActive = false;
+      
+      // Find next active player before removing
+      const nextPlayerIdx = this.getNextActivePlayer((playerIndex + 1) % this.players.length);
+      
+      // Remove the player from the array
+      this.players.splice(playerIndex, 1);
+      
+      // Adjust currentPlayerIndex after removal
+      if (nextPlayerIdx > playerIndex) {
+        this.currentPlayerIndex = nextPlayerIdx - 1;
+      } else if (nextPlayerIdx === playerIndex) {
+        // The leaving player was the next player too, find another
+        this.currentPlayerIndex = this.getNextActivePlayer(0);
+      } else {
+        this.currentPlayerIndex = nextPlayerIdx;
+      }
+    } else {
+      // Just mark them as folded and remove
+      player.isFolded = true;
+      player.isActive = false;
+      
+      // Remove the player from the game
+      this.players.splice(playerIndex, 1);
+      
+      // Adjust currentPlayerIndex if the removed player was before current player
+      if (this.currentPlayerIndex > playerIndex) {
+        this.currentPlayerIndex--;
+      }
+    }
+    
+    console.log(`After removal, game players:`, this.players.map(p => ({ id: p.id, username: p.username })));
+    console.log(`=================================`);
+    
+    // Check if only one active player remains (hand ends immediately)
+    const activePlayers = this.getActivePlayers();
+    if (activePlayers.length === 1) {
+      console.log('Only one player remains after removal, ending hand');
+      this.endHandEarly(activePlayers[0]);
+    } else if (activePlayers.length === 0) {
+      console.log('No active players remain, game cannot continue');
+      this.gamePhase = 'finished';
+    }
+    
+    console.log(`Player removed. Remaining players: ${this.players.length}, Active: ${activePlayers.length}`);
+  }
+
+  // FIXED: Properly check if betting round is complete with all-in players
   isBettingRoundComplete() {
     const activePlayers = this.getActivePlayers();
     
@@ -597,15 +712,34 @@ class PokerGame {
       return true;
     }
     
+    // Get the highest current bet among active players
+    const highestBet = Math.max(...activePlayers.map(p => p.currentBet));
+    
+    console.log(`📊 Betting round check: highestBet=${highestBet}`);
+    
+    // Check each active player
     for (const player of activePlayers) {
-      if (!player.hasActed && !player.isAllIn) {
+      console.log(`  - ${player.username}: bet=${player.currentBet}, acted=${player.hasActed}, allIn=${player.isAllIn}, chips=${player.chips}`);
+      
+      // Skip all-in players - they can't act
+      if (player.isAllIn) {
+        continue;
+      }
+      
+      // Player hasn't acted yet
+      if (!player.hasActed) {
+        console.log(`    ❌ ${player.username} hasn't acted yet`);
         return false;
       }
-      if (player.currentBet < this.currentBet && !player.isAllIn) {
+      
+      // Player's bet is less than the highest bet (and they're not all-in)
+      if (player.currentBet < highestBet) {
+        console.log(`    ❌ ${player.username} bet ${player.currentBet} < ${highestBet}`);
         return false;
       }
     }
     
+    console.log(`✅ Betting round complete!`);
     return true;
   }
 
@@ -641,6 +775,7 @@ class PokerGame {
       player.currentBet = 0;
     });
     this.currentBet = 0;
+    this.lastRaiseAmount = 0;
     this.bettingRound++;
 
     switch (this.gamePhase) {
@@ -737,7 +872,6 @@ class PokerGame {
   }
 
   getGameState() {
-    // CRITICAL: Get the actual player ID as a STRING, not the index
     let currentPlayerId = null;
     if (this.currentPlayerIndex >= 0 && this.currentPlayerIndex < this.players.length) {
       currentPlayerId = String(this.players[this.currentPlayerIndex].id);
@@ -754,11 +888,12 @@ class PokerGame {
       gamePhase: this.gamePhase,
       pot: this.pot,
       currentBet: this.currentBet,
-      currentPlayer: currentPlayerId, // This is now guaranteed to be a string
+      lastRaiseAmount: this.lastRaiseAmount,
+      currentPlayer: currentPlayerId,
       dealerPosition: this.dealerPosition,
       communityCards: this.communityCards.map(card => card.toString()),
       players: this.players.map(player => ({
-        id: String(player.id), // Ensure string
+        id: String(player.id),
         username: player.username,
         chips: player.chips,
         currentBet: player.currentBet,

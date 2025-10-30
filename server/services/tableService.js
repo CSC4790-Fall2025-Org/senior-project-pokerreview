@@ -149,6 +149,7 @@ class TableService {
           communityCards: gameState.communityCards,
           gamePhase: gameState.gamePhase,
           currentPlayer: gameState.currentPlayer,
+          lastRaiseAmount: gameState.lastRaiseAmount,
           players: table.players.map(player => {
             const gamePlayer = gameState.players.find(gp => gp.id === player.id);
             if (gamePlayer) {
@@ -186,7 +187,8 @@ class TableService {
         currentPot: gameState.pot,
         communityCards: gameState.communityCards,
         gamePhase: gameState.gamePhase,
-        currentPlayer: gameState.currentPlayer,
+        currentPlayer: gameState.currentPlayer, // This should be the player ID from game engine
+        lastRaiseAmount: gameState.lastRaiseAmount,
         dealerPosition: gameState.dealerPosition,
         players: table.players.map(player => {
           const gamePlayer = gameState.players.find(gp => gp.id === player.id);
