@@ -1,7 +1,14 @@
 NOTES WHILE PLAYING:
 
-betting post flop (after first 3 cards come out) is viewed as invalid action (check/fold work fine)
-- had something to do with player IDs not being consistent between str and int
+
+3rd player joins in middle of hand, gets 2 cards face down. 
+after hand ends, 3rd player does not get dealt in on the next hand. 
+after showdown (check check) river, it requires a 3rd check for whatever reason. 
+leave table mid hand, never terminates or moves on, should be treated as a fold.
+
+
+
+
 
 Maybe scroll wheel for betting/raising instead of ^ down option
 
@@ -11,8 +18,5 @@ Should have the ability to click on the seat to choose ur seat. Not just randomi
 
 How to handle user getting stacked? No option to rebuy at same seat. Heads up, just ends.
 
-Leave table, doesn’t work. If I rejoin the table its as if I Never left.
-
-Own modal for raise (don’t let opponents / your cards appear)
 
 Border on images

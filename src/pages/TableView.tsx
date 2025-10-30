@@ -665,10 +665,14 @@ export const TableView: React.FC = () => {
                         ) : (
                           <Button
                             onClick={handleCall}
-                            disabled={isActionLoading || callAmount > (myPlayer?.chips || 0)}
+                            disabled={isActionLoading}  // <-- ONLY disable during loading
                             className="bg-green-600 hover:bg-green-700 min-w-20"
                           >
-                            {isActionLoading ? '...' : `Call ${formatCurrency(callAmount)}`}
+                            {isActionLoading ? '...' : 
+                              callAmount >= (myPlayer?.chips || 0)
+                                ? `Call All-In ${formatCurrency(myPlayer?.chips || 0)}`
+                                : `Call ${formatCurrency(callAmount)}`
+                            }
                           </Button>
                         )}
                         
@@ -729,7 +733,7 @@ export const TableView: React.FC = () => {
                 )}
               </div>
             )}
-
+            
             {/* Bet/Raise Modal */}
             {showRaiseModal && (() => {
               // Recalculate values with fresh table data when modal renders
@@ -740,6 +744,7 @@ export const TableView: React.FC = () => {
                 ? table.lastRaiseAmount 
                 : table.bigBlind;
               const minRaiseNow = currentBetNow + minRaiseIncrementNow;
+              const maxAmount = myPlayerNow?.chips || 0;
               
               return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -765,27 +770,70 @@ export const TableView: React.FC = () => {
                         <input
                           type="number"
                           min={isFacingBetNow ? minRaiseNow : table.bigBlind}
-                          max={myPlayerNow?.chips || 0}
+                          max={maxAmount}
                           step={table.bigBlind}
                           value={raiseAmount}
-                          onChange={(e) => setRaiseAmount(Number(e.target.value))}
+                          onChange={(e) => {
+                            const inputValue = Number(e.target.value);
+                            // Cap at maximum available chips
+                            const cappedValue = Math.min(inputValue, maxAmount);
+                            setRaiseAmount(cappedValue);
+                          }}
+                          onBlur={(e) => {
+                            // On blur, ensure value is within valid range
+                            const inputValue = Number(e.target.value);
+                            const minValue = isFacingBetNow ? minRaiseNow : table.bigBlind;
+                            if (inputValue > maxAmount) {
+                              setRaiseAmount(maxAmount);
+                            } else if (inputValue < minValue) {
+                              setRaiseAmount(minValue);
+                            }
+                          }}
                           className="w-full pl-8 pr-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-poker-gold"
                         />
                       </div>
                       <p className="text-sm text-gray-400 mt-1">
-                        Min: {formatCurrency(isFacingBetNow ? minRaiseNow : table.bigBlind)} | Max: {formatCurrency(myPlayerNow?.chips || 0)}
+                        Min: {formatCurrency(isFacingBetNow ? minRaiseNow : table.bigBlind)} | Max: {formatCurrency(maxAmount)}
                       </p>
                       {isFacingBetNow && (
                         <p className="text-xs text-gray-500 mt-2">
                           (Current bet: {formatCurrency(currentBetNow)} + Min raise: {formatCurrency(minRaiseIncrementNow)})
                         </p>
                       )}
+                      
+                      {/* Quick bet buttons */}
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={() => setRaiseAmount(isFacingBetNow ? minRaiseNow : table.bigBlind)}
+                          className="flex-1 px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded"
+                        >
+                          Min
+                        </button>
+                        <button
+                          onClick={() => setRaiseAmount(Math.floor((isFacingBetNow ? minRaiseNow : table.bigBlind) + (maxAmount - (isFacingBetNow ? minRaiseNow : table.bigBlind)) * 0.5))}
+                          className="flex-1 px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded"
+                        >
+                          1/2 Pot
+                        </button>
+                        <button
+                          onClick={() => setRaiseAmount(Math.floor((isFacingBetNow ? minRaiseNow : table.bigBlind) + (maxAmount - (isFacingBetNow ? minRaiseNow : table.bigBlind)) * 0.75))}
+                          className="flex-1 px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded"
+                        >
+                          3/4 Pot
+                        </button>
+                        <button
+                          onClick={() => setRaiseAmount(maxAmount)}
+                          className="flex-1 px-3 py-1 bg-red-700 hover:bg-red-600 text-white text-sm rounded font-semibold"
+                        >
+                          All-In
+                        </button>
+                      </div>
                     </div>
 
                     <div className="flex space-x-4">
                       <Button 
                         onClick={() => isFacingBetNow ? handleRaise(raiseAmount) : handleBet(raiseAmount)}
-                        disabled={raiseAmount < (isFacingBetNow ? minRaiseNow : table.bigBlind) || raiseAmount > (myPlayerNow?.chips || 0)}
+                        disabled={raiseAmount < (isFacingBetNow ? minRaiseNow : table.bigBlind) || raiseAmount > maxAmount}
                         className="flex-1"
                       >
                         {isFacingBetNow ? `Raise to ${formatCurrency(raiseAmount)}` : `Bet ${formatCurrency(raiseAmount)}`}
