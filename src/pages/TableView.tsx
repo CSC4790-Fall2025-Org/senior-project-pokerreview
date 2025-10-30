@@ -674,7 +674,21 @@ export const TableView: React.FC = () => {
                         
                         <Button
                           onClick={() => {
-                            setRaiseAmount(minRaise); // Set to minimum valid raise
+                            // Recalculate with current table data
+                            const currentBetNow = table.players.reduce((max, p) => Math.max(max, p.currentBet || 0), 0);
+                            const minRaiseIncrementNow = (table.lastRaiseAmount && table.lastRaiseAmount > 0) 
+                              ? table.lastRaiseAmount 
+                              : table.bigBlind;
+                            const minRaiseNow = currentBetNow + minRaiseIncrementNow;
+                            
+                            console.log('Opening raise modal:', {
+                              currentBetNow,
+                              lastRaiseAmount: table.lastRaiseAmount,
+                              minRaiseIncrementNow,
+                              minRaiseNow
+                            });
+                            
+                            setRaiseAmount(minRaiseNow);
                             setShowRaiseModal(true);
                           }}
                           disabled={isActionLoading || (myPlayer?.chips || 0) <= callAmount}
@@ -717,66 +731,77 @@ export const TableView: React.FC = () => {
             )}
 
             {/* Bet/Raise Modal */}
-            {showRaiseModal && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold text-white">
-                      {isFacingBet ? 'Raise Amount' : 'Bet Amount'}
-                    </h2>
-                    <button
-                      onClick={() => setShowRaiseModal(false)}
-                      className="text-gray-400 hover:text-white text-2xl"
-                    >
-                      ×
-                    </button>
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      {isFacingBet ? 'Raise to:' : 'Bet amount:'}
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">$</span>
-                      <input
-                        type="number"
-                        min={isFacingBet ? minRaise : table.bigBlind}
-                        max={myPlayer?.chips || 0}
-                        step={table.bigBlind}
-                        value={raiseAmount}
-                        onChange={(e) => setRaiseAmount(Number(e.target.value))}
-                        className="w-full pl-8 pr-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-poker-gold"
-                      />
+            {showRaiseModal && (() => {
+              // Recalculate values with fresh table data when modal renders
+              const currentBetNow = table.players.reduce((max, p) => Math.max(max, p.currentBet || 0), 0);
+              const myPlayerNow = table.players.find(p => String(p.id) === String(user?.id));
+              const isFacingBetNow = currentBetNow > 0;
+              const minRaiseIncrementNow = (table.lastRaiseAmount && table.lastRaiseAmount > 0) 
+                ? table.lastRaiseAmount 
+                : table.bigBlind;
+              const minRaiseNow = currentBetNow + minRaiseIncrementNow;
+              
+              return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                  <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+                    <div className="flex justify-between items-center mb-6">
+                      <h2 className="text-xl font-bold text-white">
+                        {isFacingBetNow ? 'Raise Amount' : 'Bet Amount'}
+                      </h2>
+                      <button
+                        onClick={() => setShowRaiseModal(false)}
+                        className="text-gray-400 hover:text-white text-2xl"
+                      >
+                        ×
+                      </button>
                     </div>
-                    <p className="text-sm text-gray-400 mt-1">
-                      Min: {formatCurrency(isFacingBet ? minRaise : table.bigBlind)} | Max: {formatCurrency(myPlayer?.chips || 0)}
-                    </p>
-                    {isFacingBet && (
-                      <p className="text-xs text-gray-500 mt-2">
-                        (Current bet: {formatCurrency(currentBet)} + Min raise: {formatCurrency(minRaiseIncrement)})
-                      </p>
-                    )}
-                  </div>
 
-                  <div className="flex space-x-4">
-                    <Button 
-                      onClick={() => isFacingBet ? handleRaise(raiseAmount) : handleBet(raiseAmount)}
-                      disabled={raiseAmount < (isFacingBet ? minRaise : table.bigBlind) || raiseAmount > (myPlayer?.chips || 0)}
-                      className="flex-1"
-                    >
-                      {isFacingBet ? `Raise to ${formatCurrency(raiseAmount)}` : `Bet ${formatCurrency(raiseAmount)}`}
-                    </Button>
-                    <Button 
-                      variant="secondary" 
-                      onClick={() => setShowRaiseModal(false)} 
-                      className="flex-1"
-                    >
-                      Cancel
-                    </Button>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        {isFacingBetNow ? 'Raise to:' : 'Bet amount:'}
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">$</span>
+                        <input
+                          type="number"
+                          min={isFacingBetNow ? minRaiseNow : table.bigBlind}
+                          max={myPlayerNow?.chips || 0}
+                          step={table.bigBlind}
+                          value={raiseAmount}
+                          onChange={(e) => setRaiseAmount(Number(e.target.value))}
+                          className="w-full pl-8 pr-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-poker-gold"
+                        />
+                      </div>
+                      <p className="text-sm text-gray-400 mt-1">
+                        Min: {formatCurrency(isFacingBetNow ? minRaiseNow : table.bigBlind)} | Max: {formatCurrency(myPlayerNow?.chips || 0)}
+                      </p>
+                      {isFacingBetNow && (
+                        <p className="text-xs text-gray-500 mt-2">
+                          (Current bet: {formatCurrency(currentBetNow)} + Min raise: {formatCurrency(minRaiseIncrementNow)})
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex space-x-4">
+                      <Button 
+                        onClick={() => isFacingBetNow ? handleRaise(raiseAmount) : handleBet(raiseAmount)}
+                        disabled={raiseAmount < (isFacingBetNow ? minRaiseNow : table.bigBlind) || raiseAmount > (myPlayerNow?.chips || 0)}
+                        className="flex-1"
+                      >
+                        {isFacingBetNow ? `Raise to ${formatCurrency(raiseAmount)}` : `Bet ${formatCurrency(raiseAmount)}`}
+                      </Button>
+                      <Button 
+                        variant="secondary" 
+                        onClick={() => setShowRaiseModal(false)} 
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
 
           {/* Sidebar */}

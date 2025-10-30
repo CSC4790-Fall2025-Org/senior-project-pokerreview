@@ -187,6 +187,7 @@ class PokerGame {
     this.pot = 0;
     this.sidePots = [];
     this.currentBet = 0;
+    this.lastRaiseAmount = 0; // Track the size of the last raise
     this.dealerPosition = 0;
     this.currentPlayerIndex = 0;
     this.gamePhase = 'preflop';
@@ -202,6 +203,7 @@ class PokerGame {
     this.pot = 0;
     this.sidePots = [];
     this.currentBet = 0;
+    this.lastRaiseAmount = 0; // Reset last raise amount
     this.gamePhase = 'preflop';
     this.bettingRound = 0;
     
@@ -386,10 +388,12 @@ class PokerGame {
   }
 
   playerBetAction(player, amount) {
+    // Validate this is actually a bet scenario (no current bet)
     if (this.currentBet > 0) {
       throw new Error('Cannot bet - there is already a bet. Use raise instead.');
     }
 
+    // Minimum bet is big blind
     const minBet = this.bigBlind;
     if (amount < minBet) {
       throw new Error(`Minimum bet is $${minBet}`);
@@ -399,9 +403,16 @@ class PokerGame {
       throw new Error('Insufficient chips for bet');
     }
 
+    const previousBet = this.currentBet; // Should be 0 at this point - MOVED THIS LINE UP
     const result = this.playerBet(this.players.indexOf(player), amount, 'bet');
+    
+    // CRITICAL: Update both currentBet and lastRaiseAmount
     this.currentBet = player.currentBet;
+    this.lastRaiseAmount = this.currentBet - previousBet; // The bet size itself
+    
+    console.log(`✅ Bet complete: previousBet=${previousBet}, newBet=${this.currentBet}, lastRaiseAmount=${this.lastRaiseAmount}`);
 
+    // Reset hasActed for all other players since there was a bet
     this.players.forEach(p => {
       if (p.id !== player.id && !p.isFolded && !p.isAllIn) {
         p.hasActed = false;
@@ -412,23 +423,46 @@ class PokerGame {
   }
 
   playerRaise(player, amount) {
+    console.log('🎯 RAISE ATTEMPT:', {
+      attemptedAmount: amount,
+      currentBet: this.currentBet,
+      lastRaiseAmount: this.lastRaiseAmount,
+      playerCurrentBet: player.currentBet
+    });
+    
     if (this.currentBet === 0) {
       throw new Error('Cannot raise - no bet to raise. Use bet instead.');
     }
 
-    const minRaise = this.currentBet * 2;
+    const previousBet = this.currentBet;
+    const minRaiseIncrement = this.lastRaiseAmount > 0 ? this.lastRaiseAmount : this.bigBlind;
+    const minRaise = this.currentBet + minRaiseIncrement;
+    
+    console.log('=== RAISE VALIDATION ===');
+    console.log('Previous bet (currentBet):', previousBet);
+    console.log('Player current bet BEFORE action:', player.currentBet);
+    console.log('Last raise amount:', this.lastRaiseAmount);
+    console.log('Min raise increment:', minRaiseIncrement);
+    console.log('Min raise total:', minRaise);
+    console.log('Attempted raise:', amount);
+    console.log('=======================');
     
     if (amount < minRaise) {
-      throw new Error(`Minimum raise is to $${minRaise}`);
+      throw new Error(`Minimum raise is to $${minRaise} (current bet $${this.currentBet} + min raise $${minRaiseIncrement})`);
     }
     
-    if (player.chips < amount) {
+    const totalBetNeeded = amount - player.currentBet;
+    if (player.chips < totalBetNeeded) {
       throw new Error('Insufficient chips for raise');
     }
     
-    const totalBet = amount - player.currentBet;
-    const result = this.playerBet(this.players.indexOf(player), totalBet, 'raise');
-    this.currentBet = player.currentBet;
+    const result = this.playerBet(this.players.indexOf(player), totalBetNeeded, 'raise');
+    
+    const newTotalBet = player.currentBet;
+    this.lastRaiseAmount = newTotalBet - previousBet;
+    this.currentBet = newTotalBet;
+    
+    console.log(`✅ Raise complete: previousBet=${previousBet}, newBet=${this.currentBet}, raiseIncrement=${this.lastRaiseAmount}`);
     
     this.players.forEach(p => {
       if (p.id !== player.id && !p.isFolded && !p.isAllIn) {
@@ -575,6 +609,7 @@ class PokerGame {
       player.currentBet = 0;
     });
     this.currentBet = 0;
+    this.lastRaiseAmount = 0; // Reset for new betting round
     this.bettingRound++;
 
     switch (this.gamePhase) {
@@ -688,6 +723,7 @@ class PokerGame {
       gamePhase: this.gamePhase,
       pot: this.pot,
       currentBet: this.currentBet,
+      lastRaiseAmount: this.lastRaiseAmount, // Include for frontend min raise calculation
       currentPlayer: currentPlayerId, // This is now guaranteed to be a string
       dealerPosition: this.dealerPosition,
       communityCards: this.communityCards.map(card => card.toString()),
