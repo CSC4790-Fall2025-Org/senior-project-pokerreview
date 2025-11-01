@@ -52,6 +52,10 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
+// Get hand history for a table 
+// putthing this above auth token for now just cause i dont wanna deal with authentication
+router.get('/:tableId/hand-history', TableController.getHandHistory);
+
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
 
@@ -67,6 +71,7 @@ router.get('/:tableId', TableController.getTable);
 
 // Get game state for a table
 router.get('/:tableId/game-state', TableController.getGameState);
+
 
 // Join table as spectator
 router.post('/:tableId/spectate', TableController.joinAsSpectator);

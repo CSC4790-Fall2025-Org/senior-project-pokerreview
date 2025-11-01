@@ -5,7 +5,8 @@ const { PokerGame } = require('./pokerEngine');
 class TableService {
   static activeTables = new Map();
   static activeGames = new Map(); // Store actual poker games
-  
+  static completedHands = new Map();
+
   // Table templates
   static TABLE_TEMPLATES = [
     {
@@ -365,7 +366,22 @@ class TableService {
         
         // Check if game ended and start new hand
         if (gameState.gamePhase === 'finished') {
+          // CRITICAL: Get the finalized hand log from the game
+          const completedHandLog = game.currentHandLog || game.finalizedHandLog;
+          if (completedHandLog) {
+            if (!this.completedHands.has(tableId)) {
+              this.completedHands.set(tableId, []);
+            }
+            this.completedHands.get(tableId).push(completedHandLog);
+            console.log(`✅ Stored hand log for table ${tableId}`);
+            console.log(`📊 Total hands logged: ${this.completedHands.get(tableId).length}`);
+            
+            // Now clear it from the game
+            game.currentHandLog = null;
+          }
+          
           setTimeout(() => {
+            // THEN: Start new hand
             if (table.players.filter(p => p.chips > 0).length >= 2) {
               game.startNewHand();
             } else {
@@ -504,10 +520,39 @@ class TableService {
     });
   }
 
+// FIXED: Remove duplicate getGameState method definition
+// This section should appear only ONCE at the end of your TableService class
+
   // Get game state for a specific table
   static getGameState(tableId) {
     const game = this.activeGames.get(tableId);
     return game ? game.getGameState() : null;
+  }
+
+  // Get completed hand logs for a table (last N hands)
+  static getHandLogs(tableId, limit = 10) {
+    const logs = this.completedHands.get(tableId) || [];
+    console.log(`📋 getHandLogs called for table ${tableId}`);
+    console.log(`📋 Found ${logs.length} total hands, returning last ${limit}`);
+    return logs.slice(-limit); // Return last N hands
+  }
+
+  // Get all hand logs for a table
+  static getAllHandLogs(tableId) {
+    const logs = this.completedHands.get(tableId) || [];
+    console.log(`📋 getAllHandLogs called for table ${tableId}`);
+    console.log(`📋 Found ${logs.length} total hands`);
+    return logs;
+  }
+
+  // DIAGNOSTIC: Check what's in completedHands
+  static debugHandLogs() {
+    console.log('=== COMPLETED HANDS DEBUG ===');
+    console.log('All table IDs with logs:', Array.from(this.completedHands.keys()));
+    this.completedHands.forEach((logs, tableId) => {
+      console.log(`  Table ${tableId}: ${logs.length} hands`);
+    });
+    console.log('============================');
   }
 }
 

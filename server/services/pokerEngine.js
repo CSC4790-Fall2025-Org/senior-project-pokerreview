@@ -194,6 +194,7 @@ class PokerGame {
     this.gamePhase = 'preflop';
     this.bettingRound = 0;
     this.gameHistory = [];
+    this.currentHandLog = null;
   }
 
   startNewHand() {
@@ -207,6 +208,31 @@ class PokerGame {
     this.lastRaiseAmount = 0;
     this.gamePhase = 'preflop';
     this.bettingRound = 0;
+
+    this.currentHandLog = {
+      handId: `${this.tableId}-${Date.now()}`,
+      timestamp: new Date(),
+      tableId: this.tableId,
+      smallBlind: this.smallBlind,
+      bigBlind: this.bigBlind,
+      startingStacks: this.players.map(p => ({
+        id: p.id,
+        username: p.username,
+        chips: p.chips,
+        position: p.position
+      })),
+      dealerPosition: this.dealerPosition,
+      actions: [],
+      boardCards: {
+        flop: [],
+        turn: null,
+        river: null
+      },
+      showdown: null,
+      winners: [],
+      endingStacks: [],
+      duration: null
+    };
     
     this.players.forEach(player => {
       player.cards = [];
@@ -236,6 +262,27 @@ class PokerGame {
     
     this.logAction('game', 'New hand started');
     return this.getGameState();
+  }
+
+  finalizeHandLog() {
+    if (!this.currentHandLog) return null;
+    
+    // Calculate hand duration
+    this.currentHandLog.duration = Date.now() - this.currentHandLog.timestamp.getTime();
+    
+    // Record ending stacks
+    this.currentHandLog.endingStacks = this.players.map(p => ({
+      id: p.id,
+      username: p.username,
+      chips: p.chips,
+      profit: p.chips - this.currentHandLog.startingStacks.find(s => s.id === p.id)?.chips
+    }));
+    
+    const completedLog = { ...this.currentHandLog };
+    this.finalizedHandLog = completedLog; // Store it before clearing
+    this.currentHandLog = null;
+    
+    return completedLog;
   }
 
   setBlinds() {
@@ -528,7 +575,8 @@ class PokerGame {
       action: actionType,
       amount: actualAmount,
       playerChips: player.chips,
-      currentBet: player.currentBet
+      currentBet: player.currentBet,
+      potAfter: this.pot
     };
   }
 
@@ -559,6 +607,12 @@ class PokerGame {
   endHandEarly(winner) {
     winner.chips += this.pot;
     this.logAction(winner.username, `wins $${this.pot} (all others folded)`);
+    
+    // CRITICAL FIX: Finalize and return the hand log
+    if (this.currentHandLog) {
+      this.finalizeHandLog();
+    }
+    
     this.gamePhase = 'finished';
     
     console.log(`Hand finished. Winner: ${winner.username}`);
@@ -745,19 +799,37 @@ class PokerGame {
 
   dealFlop() {
     this.deck.deal(1);
-    this.communityCards.push(...this.deck.deal(3));
+    const flopCards = this.deck.deal(3);
+    this.communityCards.push(...flopCards);
+    
+    if (this.currentHandLog) {
+      this.currentHandLog.boardCards.flop = flopCards.map(c => c.toString());
+    }
+    
     this.logAction('game', 'Flop dealt');
   }
 
   dealTurn() {
     this.deck.deal(1);
-    this.communityCards.push(...this.deck.deal(1));
+    const turnCard = this.deck.deal(1)[0];
+    this.communityCards.push(turnCard);
+    
+    if (this.currentHandLog) {
+      this.currentHandLog.boardCards.turn = turnCard.toString();
+    }
+    
     this.logAction('game', 'Turn dealt');
   }
 
   dealRiver() {
     this.deck.deal(1);
-    this.communityCards.push(...this.deck.deal(1));
+    const riverCard = this.deck.deal(1)[0];
+    this.communityCards.push(riverCard);
+    
+    if (this.currentHandLog) {
+      this.currentHandLog.boardCards.river = riverCard.toString();
+    }
+    
     this.logAction('game', 'River dealt');
   }
 
@@ -770,6 +842,10 @@ class PokerGame {
     } else {
       this.evaluateShowdown(activePlayers);
     }
+    if (this.currentHandLog) {
+      const handLog = this.finalizeHandLog();
+      console.log('📊 HAND COMPLETE:', JSON.stringify(handLog, null, 2));
+    }
     
     this.gamePhase = 'finished';
   }
@@ -781,6 +857,9 @@ class PokerGame {
     }));
 
     playerHands.sort((a, b) => {
+      // Handle null hands
+      if (!a.hand || !b.hand) return 0;
+      
       if (a.hand.rank !== b.hand.rank) {
         return b.hand.rank - a.hand.rank;
       }
@@ -803,6 +882,24 @@ class PokerGame {
       winner.player.chips += winAmount;
       this.logAction(winner.player.username, `wins $${winAmount} with ${winner.hand.name}`);
     });
+    // Log showdown results
+    if (this.currentHandLog) {
+      this.currentHandLog.showdown = {
+        playersShown: playerHands.map(ph => ({
+          id: ph.player.id,
+          username: ph.player.username,
+          cards: ph.player.cards.map(c => c.toString()),
+          handRank: ph.hand.name,
+          handCards: ph.hand.cards
+        })),
+        winners: winners.map(w => ({
+          id: w.player.id,
+          username: w.player.username,
+          amountWon: winAmount,
+          handRank: w.hand.name
+        }))
+      };
+    }
   }
 
   getGameState() {
@@ -845,15 +942,31 @@ class PokerGame {
     };
   }
 
-  logAction(player, action) {
+  logAction(player, action, metadata = {}) {
     const logEntry = {
       timestamp: new Date(),
       player,
       action,
       pot: this.pot,
-      phase: this.gamePhase
+      phase: this.gamePhase,
+      ...metadata
     };
+    
     this.gameHistory.push(logEntry);
+    
+    // Add to current hand log if exists
+    if (this.currentHandLog) {
+      this.currentHandLog.actions.push({
+        player,
+        action,
+        pot: this.pot,
+        phase: this.gamePhase,
+        currentBet: this.currentBet,
+        timestamp: new Date(),
+        ...metadata
+      });
+    }
+    
     console.log(`[${this.tableId}] ${player}: ${action} (Pot: $${this.pot})`);
   }
 }

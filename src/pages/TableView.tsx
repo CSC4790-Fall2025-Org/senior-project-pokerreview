@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import { TableService, TableData } from '../services/api/table';
 import { Button } from '../components/common/Button';
 import { motion } from 'framer-motion';
+import { HandHistory } from '../components/common/HandHistory';
 
 
 interface JoinAsPlayerModalProps {
@@ -198,6 +199,8 @@ export const TableView: React.FC = () => {
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [showRaiseModal, setShowRaiseModal] = useState(false);
   const [raiseAmount, setRaiseAmount] = useState(20);
+  const [showHandHistory, setShowHandHistory] = useState(false);
+
 
   // Load table data
   useEffect(() => {
@@ -941,6 +944,15 @@ export const TableView: React.FC = () => {
               )}
             </div>
 
+            {/* Hand History Button */}
+            <Button
+              onClick={() => setShowHandHistory(true)}
+              variant="secondary"
+              className="w-full"
+            >
+              📊 View Hand History
+            </Button>
+
             {/* Spectators List */}
             {table.spectatorList && table.spectatorList.length > 0 && (
               <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
@@ -974,6 +986,13 @@ export const TableView: React.FC = () => {
         maxBuyIn={table.buyInMax}
         isLoading={isJoining}
       /> 
+
+      {/* Hand History Modal */}
+      <HandHistory
+        tableId={tableId || ''}
+        isOpen={showHandHistory}
+        onClose={() => setShowHandHistory(false)}
+      />
     </div>
   );
 };

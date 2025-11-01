@@ -119,6 +119,28 @@ export class TableService {
     }
   }
 
+  // Get hand history for a table
+  static async getHandHistory(tableId: string, limit: number = 10): Promise<any> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/tables/${tableId}/hand-history?limit=${limit}`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        return data;
+      } else {
+        return { success: false, error: data.error || 'Failed to get hand history' };
+      }
+    } catch (error) {
+      console.error('Get hand history error:', error);
+      return { success: false, error: 'Network error. Please try again.' };
+    }
+  }
+
   // Get specific table details
   static async getTable(tableId: string): Promise<TableResponse> {
     try {
