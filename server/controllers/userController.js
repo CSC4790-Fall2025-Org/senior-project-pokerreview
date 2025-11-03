@@ -1,3 +1,4 @@
+// server/controllers/userController.js
 const User = require('../models/User');
 
 class UserController {
@@ -17,11 +18,11 @@ class UserController {
     console.log('req.user.userId:', req.user.userId);
     
     try {
-      // First, try a simple findById to test
-      console.log('Attempting to find user by ID:', req.user.userId);
-      const user = await User.findById(req.user.userId);
+      // ✅ FIXED: Use findByIdWithStats to get user + statistics
+      console.log('Attempting to find user with stats by ID:', req.user.userId);
+      const userWithStats = await User.findByIdWithStats(req.user.userId);
       
-      if (!user) {
+      if (!userWithStats) {
         console.log('User not found in database');
         return res.status(404).json({
           success: false,
@@ -29,22 +30,12 @@ class UserController {
         });
       }
       
-      console.log('User found:', user);
+      console.log('User with stats found:', userWithStats);
       
-      // For now, return simple user data without stats to test basic functionality
+      // Return user with real statistics from database
       res.json({
         success: true,
-        user: {
-          ...user,
-          // Add default stats for now
-          games_played: 0,
-          hands_played: 0,
-          hands_won: 0,
-          total_winnings: 0,
-          win_rate: 0,
-          avg_pot_won: 0,
-          last_played: null
-        }
+        user: userWithStats
       });
     } catch (error) {
       console.error('Get profile error:', error);
@@ -103,19 +94,13 @@ class UserController {
 
       console.log('Profile updated successfully:', updatedUser);
 
+      // ✅ FIXED: After updating, fetch user with stats
+      const userWithStats = await User.findByIdWithStats(userId);
+
       res.json({
         success: true,
-        user: {
-          ...updatedUser,
-          // Add default stats for now
-          games_played: 0,
-          hands_played: 0,
-          hands_won: 0,
-          total_winnings: 0,
-          win_rate: 0,
-          avg_pot_won: 0,
-          last_played: null
-        }
+        user: userWithStats,
+        message: 'Profile updated successfully'
       });
     } catch (error) {
       console.error('Update profile error:', error);
@@ -140,16 +125,54 @@ class UserController {
       const userId = req.user.userId;
       const limit = parseInt(req.query.limit) || 10;
 
-      // For now, return empty array since game tables might not exist yet
+      // ✅ FIXED: Use the getRecentGames method from User model
+      const recentGames = await User.getRecentGames(userId, limit);
+
       res.json({
         success: true,
-        games: []
+        games: recentGames
       });
     } catch (error) {
       console.error('Get recent games error:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error'
+      });
+    }
+  }
+
+  // ✅ NEW: Manual refresh endpoint for debugging/testing
+  static async refreshStats(req, res) {
+    console.log('=== UserController.refreshStats called ===');
+    
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
+    
+    try {
+      const userId = req.user.userId;
+      
+      console.log('Manually refreshing stats for user:', userId);
+      
+      // Refresh statistics from hand history
+      await User.refreshStatistics(userId);
+      
+      // Get updated user with stats
+      const userWithStats = await User.findByIdWithStats(userId);
+      
+      res.json({
+        success: true,
+        user: userWithStats,
+        message: 'Statistics refreshed successfully'
+      });
+    } catch (error) {
+      console.error('Refresh stats error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to refresh statistics'
       });
     }
   }

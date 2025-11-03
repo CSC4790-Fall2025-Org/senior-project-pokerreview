@@ -605,18 +605,24 @@ class PokerGame {
   }
 
   endHandEarly(winner) {
-    winner.chips += this.pot;
-    this.logAction(winner.username, `wins $${this.pot} (all others folded)`);
-    
-    // CRITICAL FIX: Finalize and return the hand log
-    if (this.currentHandLog) {
-      this.finalizeHandLog();
-    }
-    
-    this.gamePhase = 'finished';
-    
-    console.log(`Hand finished. Winner: ${winner.username}`);
+  // Finalize the hand log BEFORE doing anything else
+  if (this.currentHandLog) {
+    this.currentHandLog.duration = Date.now() - this.currentHandLog.timestamp.getTime();
+    this.currentHandLog.endingStacks = this.players.map(p => ({
+      id: p.id,
+      username: p.username,
+      chips: p.chips + (p.id === winner.id ? this.pot : 0), // Add pot to winner's chips
+      profit: (p.chips + (p.id === winner.id ? this.pot : 0)) - 
+              this.currentHandLog.startingStacks.find(s => s.id === p.id)?.chips
+    }));
   }
+  
+  winner.chips += this.pot;
+  this.logAction(winner.username, `wins $${this.pot} (all others folded)`);
+  this.gamePhase = 'finished';
+  
+  console.log(`Hand finished. Winner: ${winner.username}`);
+}
 
   dealRemainingCards() {
     while (this.communityCards.length < 5) {
@@ -842,9 +848,16 @@ class PokerGame {
     } else {
       this.evaluateShowdown(activePlayers);
     }
+    
+    // Finalize hand log BEFORE setting phase to finished
     if (this.currentHandLog) {
-      const handLog = this.finalizeHandLog();
-      console.log('📊 HAND COMPLETE:', JSON.stringify(handLog, null, 2));
+      this.currentHandLog.duration = Date.now() - this.currentHandLog.timestamp.getTime();
+      this.currentHandLog.endingStacks = this.players.map(p => ({
+        id: p.id,
+        username: p.username,
+        chips: p.chips,
+        profit: p.chips - this.currentHandLog.startingStacks.find(s => s.id === p.id)?.chips
+      }));
     }
     
     this.gamePhase = 'finished';

@@ -1,6 +1,7 @@
 // server/services/tableService.js - WITH POKER GAME ENGINE
 console.log('🔧 DEBUG: Loading tableService.js');
 const { PokerGame } = require('./pokerEngine');
+const HandHistory = require('../models/HandHistory');
 
 class TableService {
   static activeTables = new Map();
@@ -365,30 +366,52 @@ class TableService {
         });
         
         // Check if game ended and start new hand
+        // Check if game ended and start new hand
         if (gameState.gamePhase === 'finished') {
-          // CRITICAL: Get the finalized hand log from the game
-          const completedHandLog = game.currentHandLog || game.finalizedHandLog;
+          // FIRST: Store the hand log IMMEDIATELY
+          const completedHandLog = game.currentHandLog;
+          
+          console.log('=== HAND FINISHED DEBUG ===');
+          console.log('completedHandLog exists?', !!completedHandLog);
           if (completedHandLog) {
+            console.log('Hand ID:', completedHandLog.handId);
+            console.log('Players:', completedHandLog.endingStacks.map(p => ({ id: p.id, username: p.username, profit: p.profit })));
+          }
+          console.log('==========================');
+          
+          if (completedHandLog) {
+            // Store in memory
             if (!this.completedHands.has(tableId)) {
               this.completedHands.set(tableId, []);
             }
             this.completedHands.get(tableId).push(completedHandLog);
-            console.log(`✅ Stored hand log for table ${tableId}`);
-            console.log(`📊 Total hands logged: ${this.completedHands.get(tableId).length}`);
+            console.log(`✅ Stored hand log in memory for table ${tableId}`);
+            console.log(`📊 Total hands in memory: ${this.completedHands.get(tableId).length}`);
             
-            // Now clear it from the game
+            // Store in database (async, don't wait)
+            console.log('🔄 Attempting to save hand to database...');
+            HandHistory.saveHand(completedHandLog)
+              .then(dbHandId => {
+                console.log(`💾 SUCCESS! Hand saved to database with ID: ${dbHandId}`);
+              })
+              .catch(err => {
+                console.error('❌ FAILED to save hand to database:');
+                console.error('Error message:', err.message);
+                console.error('Error stack:', err.stack);
+              });
+            
+            // Clear from game
             game.currentHandLog = null;
           }
           
           setTimeout(() => {
-            // THEN: Start new hand
             if (table.players.filter(p => p.chips > 0).length >= 2) {
               game.startNewHand();
             } else {
               table.status = 'waiting';
               this.activeGames.delete(tableId);
             }
-          }, 5000); // 5 second delay before next hand
+          }, 5000);
         }
       }
       
