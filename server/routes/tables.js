@@ -54,7 +54,7 @@ const handleValidationErrors = (req, res, next) => {
 
 // Get hand history for a table 
 // putthing this above auth token for now just cause i dont wanna deal with authentication
-router.get('/:tableId/hand-history', TableController.getHandHistory);
+// router.get('/:tableId/hand-history', TableController.getHandHistory);
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);

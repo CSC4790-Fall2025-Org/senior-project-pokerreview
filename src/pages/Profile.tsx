@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { UserService, UserProfile } from '../services/api/user';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
+import { HandHistory } from '../components/common/HandHistory';
 
 export const Profile: React.FC = () => {
   const { user, logout } = useAuthStore();
@@ -12,6 +13,7 @@ export const Profile: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [showHandHistory, setShowHandHistory] = useState(false);
   const [formData, setFormData] = useState({
     username: user?.username || '',
     email: user?.email || '',
@@ -239,6 +241,27 @@ export const Profile: React.FC = () => {
             </div>
           </div>
 
+          {/* Hand History Section */}
+          <div className="mt-12">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-white">Hand History</h2>
+              <Button
+                onClick={() => setShowHandHistory(true)}
+                variant="secondary"
+              >
+                View All Hands
+              </Button>
+            </div>
+            <div className="bg-gray-900 rounded-lg p-6">
+              <p className="text-gray-400">
+                {userProfile?.hands_played ? 
+                  `You've played ${userProfile.hands_played} hands across all tables` :
+                  'No hands played yet. Join a game to start playing!'
+                }
+              </p>
+            </div>
+          </div>
+
           {/* Recent Activity */}
           <div className="mt-12">
             <h2 className="text-xl font-semibold text-white mb-6">Recent Activity</h2>
@@ -268,6 +291,11 @@ export const Profile: React.FC = () => {
               </Button>
             </div>
           </div>
+          {/* Hand History Modal */}
+          <HandHistory
+            isOpen={showHandHistory}
+            onClose={() => setShowHandHistory(false)}
+          />
         </div>
       </main>
     </div>

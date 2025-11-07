@@ -1,11 +1,10 @@
 // src/pages/TableView.tsx - FINAL VERSION WITH FIXED CARD ANIMATIONS
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { TableService, TableData } from '../services/api/table';
 import { Button } from '../components/common/Button';
 import { motion } from 'framer-motion';
-import { HandHistory } from '../components/common/HandHistory';
 
 
 interface JoinAsPlayerModalProps {
@@ -30,6 +29,7 @@ const JoinAsPlayerModal: React.FC<JoinAsPlayerModalProps> = ({
 }) => {
   const [buyInAmount, setBuyInAmount] = useState(minBuyIn);
   const [error, setError] = useState<string | null>(null);
+  const [gameEvents, setGameEvents] = useState<Array<{message: string, timestamp: Date, type: string}>>([]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,6 +135,8 @@ export const TableView: React.FC = () => {
   const [animatedCards, setAnimatedCards] = useState<Array<{playerId: string, card: string, index: number}>>([]);
   const [animationComplete, setAnimationComplete] = useState(false);
 
+  const seenEventsRef = useRef(new Set<string>());
+
   // Helper function to get card final position (matching exactly where static cards were)
   const getCardPosition = (playerPosition: number, cardIndex: number, maxPlayers: number) => {
     const { x: playerX, y: playerY } = getPlayerPosition(playerPosition, maxPlayers);
@@ -199,7 +201,7 @@ export const TableView: React.FC = () => {
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [showRaiseModal, setShowRaiseModal] = useState(false);
   const [raiseAmount, setRaiseAmount] = useState(20);
-  const [showHandHistory, setShowHandHistory] = useState(false);
+ const [gameEvents, setGameEvents] = useState<Array<{message: string, timestamp: Date, type: string}>>([]);
 
 
   // Load table data
@@ -214,6 +216,69 @@ export const TableView: React.FC = () => {
     const interval = setInterval(loadTable, 10000);
     return () => clearInterval(interval);
   }, [tableId, navigate]);
+
+  // Track game events
+  // Track game events
+  useEffect(() => {
+  if (!table) return;
+  
+  // Add event when game phase changes
+  if (table.gamePhase && table.gamePhase !== 'waiting') {
+    const phaseKey = `phase-${table.gamePhase}`;
+    const phaseMessage = `${table.gamePhase.charAt(0).toUpperCase() + table.gamePhase.slice(1)} begins`;
+    
+    if (!seenEventsRef.current.has(phaseKey)) {
+      seenEventsRef.current.add(phaseKey);
+      setGameEvents((prev) => [...prev, {
+        message: phaseMessage,
+        timestamp: new Date(),
+        type: 'phase'
+      }]);
+    }
+  }
+  
+  // Track player actions from the table state
+  if (table.players && Array.isArray(table.players)) {
+    table.players.forEach(player => {
+      const playerAction = (player as any).action;
+      const playerCurrentBet = (player as any).currentBet;
+      
+      if (playerAction) {
+        // Create unique key for this action to prevent duplicates
+        const actionKey = `${player.id}-${playerAction}-${playerCurrentBet || 0}-${table.gamePhase}`;
+        
+        if (!seenEventsRef.current.has(actionKey)) {
+          seenEventsRef.current.add(actionKey);
+          
+          const actionMessage = `${player.username} ${playerAction}${
+            playerCurrentBet && playerCurrentBet > 0 ? ` $${playerCurrentBet}` : ''
+          }`;
+          
+          const actionType = playerAction.indexOf('fold') !== -1 ? 'fold' : 
+                            playerAction.indexOf('raise') !== -1 || playerAction.indexOf('bet') !== -1 ? 'bet' : 'action';
+          
+          setGameEvents((prev) => [...prev, {
+            message: actionMessage,
+            timestamp: new Date(),
+            type: actionType
+          }]);
+        }
+      }
+    });
+  }
+}, [table?.gamePhase, table?.players]); // Remove gameEvents from dependencies
+
+useEffect(() => {
+  if (table?.gamePhase === 'waiting' && gameEvents.length > 0) {
+    seenEventsRef.current.clear();
+    // Add a separator event before clearing
+    setGameEvents((prev) => [...prev, {
+      message: '━━━━━━ New Hand Starting ━━━━━━',
+      timestamp: new Date(),
+      type: 'separator'
+    }]);
+  }
+}, [table?.gamePhase, gameEvents.length]);
 
   const loadTable = React.useCallback(async () => {
     if (!tableId) return;
@@ -917,8 +982,42 @@ export const TableView: React.FC = () => {
               </div>
             </div>
 
-            {/* AI Insights Panel */}
+            {/* Game Events Log */}
             <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+              <h3 className="text-lg font-semibold text-white mb-4">Game Events</h3>
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {gameEvents.length > 0 ? (
+                  gameEvents.slice().reverse().map((event, index) => (
+                    <div
+                      key={index}
+                      className={`p-2 rounded text-sm ${
+                        event.type === 'separator' ? 'bg-gray-700 border-t-2 border-poker-gold text-center' :
+                        event.type === 'bet' ? 'bg-orange-900' :
+                        event.type === 'win' ? 'bg-green-900' :
+                        event.type === 'fold' ? 'bg-red-900' :
+                        'bg-gray-900'
+                      }`}
+                    >
+                      <div className={`${event.type === 'separator' ? 'text-poker-gold font-bold' : 'text-white'}`}>
+                        {event.message}
+                      </div>
+                      {event.type !== 'separator' && (
+                        <div className="text-xs text-gray-400 mt-1">
+                          {new Date(event.timestamp).toLocaleTimeString()}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-gray-400 text-center py-4">
+                    No events yet. Game will start soon!
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* AI Insights Panel */}
+            {/* <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
               <h3 className="text-lg font-semibold text-white mb-4">AI Insights</h3>
               {isPlayer ? (
                 <div className="space-y-3">
@@ -942,16 +1041,16 @@ export const TableView: React.FC = () => {
                   Join as a player to receive AI insights and recommendations
                 </div>
               )}
-            </div>
+            </div> */}
 
             {/* Hand History Button */}
-            <Button
+            {/* <Button
               onClick={() => setShowHandHistory(true)}
               variant="secondary"
               className="w-full"
             >
               📊 View Hand History
-            </Button>
+            </Button> */}
 
             {/* Spectators List */}
             {table.spectatorList && table.spectatorList.length > 0 && (
@@ -988,11 +1087,11 @@ export const TableView: React.FC = () => {
       /> 
 
       {/* Hand History Modal */}
-      <HandHistory
+      {/* <HandHistory
         tableId={tableId || ''}
         isOpen={showHandHistory}
         onClose={() => setShowHandHistory(false)}
-      />
+      /> */}
     </div>
   );
 };

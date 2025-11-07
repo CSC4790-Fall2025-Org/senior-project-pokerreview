@@ -1,4 +1,3 @@
-
 const express = require('express');
 const UserController = require('../controllers/userController');
 const { body, validationResult } = require('express-validator');
@@ -37,5 +36,25 @@ router.put('/profile', validateProfileUpdate, handleValidationErrors, UserContro
 
 // Get user's recent games
 router.get('/recent-games', UserController.getRecentGames);
+
+// Get user's hand history (all tables)
+router.get('/hand-history', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 20;
+    const HandHistory = require('../models/HandHistory');
+    const hands = await HandHistory.getUserHandHistory(req.user.userId, limit);
+    
+    res.json({
+      success: true,
+      hands
+    });
+  } catch (error) {
+    console.error('Get user hand history error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch hand history'
+    });
+  }
+});
 
 module.exports = router;

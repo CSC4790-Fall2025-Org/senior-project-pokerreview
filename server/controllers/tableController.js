@@ -407,28 +407,28 @@ class TableController {
   }
 
   // Get hand history - ADD THIS METHOD
-  static async getHandHistory(req, res) {
-    try {
-      const { tableId } = req.params;
-      const limit = parseInt(req.query.limit) || 10;
+  // static async getHandHistory(req, res) {
+  //   try {
+  //     const { tableId } = req.params;
+  //     const limit = parseInt(req.query.limit) || 10;
       
-      console.log('=== TableController.getHandHistory called ===', { tableId, limit });
+  //     console.log('=== TableController.getHandHistory called ===', { tableId, limit });
       
-      const logs = TableService.getHandLogs(tableId, limit);
+  //     const logs = TableService.getHandLogs(tableId, limit);
       
-      res.json({
-        success: true,
-        count: logs.length,
-        hands: logs
-      });
-    } catch (error) {
-      console.error('Get hand history error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to fetch hand history'
-      });
-    }
-  }
+  //     res.json({
+  //       success: true,
+  //       count: logs.length,
+  //       hands: logs
+  //     });
+  //   } catch (error) {
+  //     console.error('Get hand history error:', error);
+  //     res.status(500).json({
+  //       success: false,
+  //       error: 'Failed to fetch hand history'
+  //     });
+  //   }
+  // }
 }
 
 

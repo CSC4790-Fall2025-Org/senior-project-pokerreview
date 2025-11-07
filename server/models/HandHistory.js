@@ -133,7 +133,24 @@ class HandHistory {
         hp.ending_chips,
         hp.profit,
         hp.is_winner,
-        hp.folded_at
+        hp.folded_at,
+        (SELECT jsonb_agg(
+          jsonb_build_object(
+            'username', hp2.username,
+            'profit', hp2.profit,
+            'is_winner', hp2.is_winner
+          )
+        ) FROM hand_players hp2 WHERE hp2.hand_id = ph.id) as all_players,
+        (SELECT jsonb_agg(
+          jsonb_build_object(
+            'player', ha.player_username,
+            'action', ha.action_type,
+            'amount', ha.amount,
+            'pot', ha.pot_after,
+            'phase', ha.phase,
+            'timestamp', ha.timestamp
+          ) ORDER BY ha.action_order
+        ) FROM hand_actions ha WHERE ha.hand_id = ph.id) as actions
       FROM poker_hands ph
       JOIN hand_players hp ON ph.id = hp.hand_id
       WHERE hp.user_id = $1

@@ -68,6 +68,34 @@ export class UserService {
     }
   }
 
+  static async getUserHandHistory(limit: number = 20): Promise<any> {
+    try {
+      const token = AuthService.getToken();
+      if (!token) {
+        console.error('No auth token found!');
+        return { success: false, error: 'No authentication token' };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/users/hand-history?limit=${limit}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        return data;
+      } else {
+        return { success: false, error: data.error || 'Failed to fetch hand history' };
+      }
+    } catch (error) {
+      console.error('Get hand history error:', error);
+      return { success: false, error: 'Network error. Please try again.' };
+    }
+  }
+
   static async updateProfile(profileData: Partial<UserProfile>): Promise<UserResponse> {
     try {
       const token = AuthService.getToken();

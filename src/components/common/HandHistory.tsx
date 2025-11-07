@@ -1,14 +1,14 @@
 // src/components/HandHistory.tsx
 import React, { useState, useEffect } from 'react';
 import { TableService } from '../../services/api/table';
+import { UserService } from '../../services/api/user';
 
 interface HandHistoryProps {
-  tableId: string;
   isOpen: boolean;
   onClose: () => void;
 }
 
-export const HandHistory: React.FC<HandHistoryProps> = ({ tableId, isOpen, onClose }) => {
+export const HandHistory: React.FC<HandHistoryProps> = ({ isOpen, onClose }) => {
   const [hands, setHands] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedHand, setSelectedHand] = useState<any>(null);
@@ -17,17 +17,27 @@ export const HandHistory: React.FC<HandHistoryProps> = ({ tableId, isOpen, onClo
     if (isOpen) {
       loadHandHistory();
     }
-  }, [isOpen, tableId]);
+  }, [isOpen]);
 
   const loadHandHistory = async () => {
     setIsLoading(true);
     try {
-      const response = await TableService.getHandHistory(tableId, 20);
+      const response = await UserService.getUserHandHistory(50);
+      console.log('Full API response:', response);
+      console.log('Response type:', typeof response);
+      console.log('Response keys:', Object.keys(response));
+      
       if (response.success) {
-        setHands(response.hands || []);
+        const handsData = response.hands || [];
+        console.log('Hands data:', handsData);
+        console.log('Number of hands:', handsData.length);
+        setHands(handsData);
+      } else {
+        console.error('API returned error:', response.error);
       }
     } catch (error) {
       console.error('Error loading hand history:', error);
+      console.error('Error details:', error instanceof Error ? error.message : String(error));
     } finally {
       setIsLoading(false);
     }
@@ -48,7 +58,11 @@ export const HandHistory: React.FC<HandHistoryProps> = ({ tableId, isOpen, onClo
     });
   };
 
-  const formatDuration = (ms: number) => {
+  const formatDuration = (startTime: string, endTime: string) => {
+    if (!startTime || !endTime) return 'N/A';
+    const start = new Date(startTime).getTime();
+    const end = new Date(endTime).getTime();
+    const ms = end - start;
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
@@ -86,13 +100,17 @@ export const HandHistory: React.FC<HandHistoryProps> = ({ tableId, isOpen, onClo
             ) : (
               <div className="p-4 space-y-2">
                 {hands.map((hand, index) => {
-                  const winner = hand.endingStacks?.find((s: any) => s.profit > 0);
+                  // Handle different possible data structures
+                  const allPlayers = hand.all_players || [];
+                  const winner = allPlayers.find((p: any) => p.is_winner) || 
+                                { username: 'Unknown', profit: 0 };
+                  
                   return (
                     <button
-                      key={hand.handId}
+                      key={hand.hand_id || hand.id || index}
                       onClick={() => setSelectedHand(hand)}
                       className={`w-full text-left p-3 rounded-lg transition-colors ${
-                        selectedHand?.handId === hand.handId
+                        selectedHand?.hand_id === hand.hand_id || selectedHand?.id === hand.id
                           ? 'bg-gray-700 border-2 border-poker-gold'
                           : 'bg-gray-900 hover:bg-gray-700 border-2 border-transparent'
                       }`}
@@ -102,12 +120,15 @@ export const HandHistory: React.FC<HandHistoryProps> = ({ tableId, isOpen, onClo
                           Hand #{hands.length - index}
                         </span>
                         <span className="text-xs text-gray-400">
-                          {formatTime(hand.timestamp)}
+                          {formatTime(hand.started_at || hand.timestamp)}
                         </span>
                       </div>
                       <div className="text-sm text-gray-300 space-y-1">
-                        <div>Winner: <span className="text-poker-gold">{winner?.username || 'N/A'}</span></div>
-                        <div>Duration: {formatDuration(hand.duration)}</div>
+                        <div>Table: <span className="text-blue-400">
+                          {hand.table_id?.split('-').slice(0, -1).join(' ') || 'Unknown'}
+                        </span></div>
+                        <div>Winner: <span className="text-poker-gold">{winner.username}</span></div>
+                        <div>Pot: <span className="text-white">{formatCurrency(hand.pot_size || 0)}</span></div>
                       </div>
                     </button>
                   );
@@ -126,47 +147,57 @@ export const HandHistory: React.FC<HandHistoryProps> = ({ tableId, isOpen, onClo
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-gray-400">Time:</span>{' '}
-                      <span className="text-white">{new Date(selectedHand.timestamp).toLocaleString()}</span>
+                      <span className="text-white">{new Date(selectedHand.started_at).toLocaleString()}</span>
                     </div>
                     <div>
                       <span className="text-gray-400">Duration:</span>{' '}
-                      <span className="text-white">{formatDuration(selectedHand.duration)}</span>
+                      <span className="text-white">{formatDuration(selectedHand.started_at, selectedHand.ended_at)}</span>
                     </div>
                     <div>
-                      <span className="text-gray-400">Blinds:</span>{' '}
-                      <span className="text-white">${selectedHand.smallBlind}/${selectedHand.bigBlind}</span>
+                      <span className="text-gray-400">Table:</span>{' '}
+                      <span className="text-white">{selectedHand.table_id}</span>
                     </div>
                     <div>
-                      <span className="text-gray-400">Dealer Position:</span>{' '}
-                      <span className="text-white">Seat {selectedHand.dealerPosition + 1}</span>
+                      <span className="text-gray-400">Final Pot:</span>{' '}
+                      <span className="text-white">{formatCurrency(selectedHand.pot_size)}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Board Cards */}
-                {selectedHand.boardCards && (
+                {(selectedHand.board_flop || selectedHand.board_turn || selectedHand.board_river) && (
                   <div className="bg-gray-900 rounded-lg p-4">
                     <h3 className="text-lg font-bold text-white mb-3">Board</h3>
                     <div className="flex gap-2">
-                      {selectedHand.boardCards.flop?.map((card: string, i: number) => (
+                      {selectedHand.board_flop && (() => {
+                        try {
+                          const flopCards = typeof selectedHand.board_flop === 'string' 
+                            ? JSON.parse(selectedHand.board_flop) 
+                            : selectedHand.board_flop;
+                          return flopCards.map((card: string, i: number) => (
+                            <img
+                              key={i}
+                              src={`/cards/${card}.svg`}
+                              alt={card}
+                              className="w-12 h-16 rounded shadow-lg"
+                            />
+                          ));
+                        } catch (e) {
+                          console.error('Error parsing flop cards:', e);
+                          return null;
+                        }
+                      })()}
+                      {selectedHand.board_turn && (
                         <img
-                          key={i}
-                          src={`/cards/${card}.svg`}
-                          alt={card}
-                          className="w-12 h-16 rounded shadow-lg"
-                        />
-                      ))}
-                      {selectedHand.boardCards.turn && (
-                        <img
-                          src={`/cards/${selectedHand.boardCards.turn}.svg`}
-                          alt={selectedHand.boardCards.turn}
+                          src={`/cards/${selectedHand.board_turn}.svg`}
+                          alt={selectedHand.board_turn}
                           className="w-12 h-16 rounded shadow-lg ml-2"
                         />
                       )}
-                      {selectedHand.boardCards.river && (
+                      {selectedHand.board_river && (
                         <img
-                          src={`/cards/${selectedHand.boardCards.river}.svg`}
-                          alt={selectedHand.boardCards.river}
+                          src={`/cards/${selectedHand.board_river}.svg`}
+                          alt={selectedHand.board_river}
                           className="w-12 h-16 rounded shadow-lg"
                         />
                       )}
@@ -213,9 +244,9 @@ export const HandHistory: React.FC<HandHistoryProps> = ({ tableId, isOpen, onClo
                 <div className="bg-gray-900 rounded-lg p-4">
                   <h3 className="text-lg font-bold text-white mb-3">Players & Results</h3>
                   <div className="space-y-2">
-                    {selectedHand.endingStacks?.map((player: any) => (
+                    {selectedHand.all_players?.map((player: any) => (
                       <div
-                        key={player.id}
+                        key={player.username}
                         className={`p-3 rounded ${
                           player.profit > 0 ? 'bg-green-900' : player.profit < 0 ? 'bg-red-900' : 'bg-gray-800'
                         }`}
@@ -228,9 +259,9 @@ export const HandHistory: React.FC<HandHistoryProps> = ({ tableId, isOpen, onClo
                             }`}>
                               {player.profit > 0 ? '+' : ''}{formatCurrency(player.profit)}
                             </div>
-                            <div className="text-xs text-gray-400">
-                              {formatCurrency(player.chips)} chips
-                            </div>
+                            {player.is_winner && (
+                              <div className="text-xs text-yellow-400">Winner</div>
+                            )}
                           </div>
                         </div>
                       </div>
