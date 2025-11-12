@@ -176,6 +176,8 @@ class PokerGame {
       isFolded: false,
       isActive: true
     }));
+
+    this.tablePlayersRef = true; // ✅ ADD THIS LINE - flag to sync with table
     
     console.log('=== PokerGame constructor ===');
     console.log('Players initialized:', this.players.map(p => ({ id: p.id, type: typeof p.id, username: p.username })));
@@ -199,6 +201,40 @@ class PokerGame {
 
   startNewHand() {
     console.log(`Starting new hand for table ${this.tableId}`);
+    
+    // ✅ NEW: Sync players from table - add any new players who joined between hands
+    if (this.tablePlayersRef) {
+      const TableService = require('./tableService');
+      const table = TableService.getTable(this.tableId);
+      
+      if (table) {
+        table.players.forEach(tablePlayer => {
+          // Check if player exists in game
+          const existsInGame = this.players.find(p => String(p.id) === String(tablePlayer.id));
+          
+          // Add new players who have chips and are active
+          if (!existsInGame && tablePlayer.chips > 0 && tablePlayer.isActive) {
+            console.log(`➕ Adding new player ${tablePlayer.username} (position ${tablePlayer.position}) to game`);
+            this.players.push({
+              id: String(tablePlayer.id),
+              username: tablePlayer.username,
+              avatar_url: tablePlayer.avatar_url,
+              position: tablePlayer.position, // Preserve table position
+              chips: tablePlayer.chips,
+              cards: [],
+              hasActed: false,
+              currentBet: 0,
+              totalInvested: 0,
+              isAllIn: false,
+              isFolded: false,
+              isActive: true
+            });
+          }
+        });
+        
+        console.log(`Game now has ${this.players.length} players:`, this.players.map(p => p.username));
+      }
+    }
     
     this.deck.reset();
     this.communityCards = [];
