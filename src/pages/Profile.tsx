@@ -195,46 +195,79 @@ export const Profile: React.FC = () => {
             {/* Game Statistics */}
             <div>
               <h2 className="text-xl font-semibold text-white mb-6">Game Statistics</h2>
-              <div className="space-y-4">
-                <div className="bg-gray-900 rounded-lg p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Total Games</span>
-                    <span className="text-white font-semibold">{userProfile?.games_played || 0}</span>
-                  </div>
+              
+              {/* Main Stats Grid */}
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                {/* Total Games - Large Card */}
+                <div className="col-span-2 bg-gradient-to-br from-poker-gold to-yellow-600 rounded-xl p-6 shadow-lg">
+                  <div className="text-gray-900 text-sm font-medium mb-1">Total Games Played</div>
+                  <div className="text-gray-900 text-5xl font-bold">{userProfile?.games_played || 0}</div>
                 </div>
                 
-                <div className="bg-gray-900 rounded-lg p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Hands Won</span>
-                    <span className="text-green-400 font-semibold">{userProfile?.hands_won || 0}</span>
+                {/* Win Rate - Circular Progress */}
+                <div className="bg-gray-900 rounded-xl p-6 shadow-lg flex flex-col items-center justify-center">
+                  <div className="relative w-32 h-32 mb-3">
+                    <svg className="transform -rotate-90 w-32 h-32">
+                      <circle
+                        cx="64"
+                        cy="64"
+                        r="56"
+                        stroke="currentColor"
+                        strokeWidth="8"
+                        fill="transparent"
+                        className="text-gray-700"
+                      />
+                      <circle
+                        cx="64"
+                        cy="64"
+                        r="56"
+                        stroke="currentColor"
+                        strokeWidth="8"
+                        fill="transparent"
+                        strokeDasharray={`${2 * Math.PI * 56}`}
+                        strokeDashoffset={`${2 * Math.PI * 56 * (1 - (userProfile?.win_rate || 0) / 100)}`}
+                        className="text-green-400"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-3xl font-bold text-white">{userProfile?.win_rate || 0}%</span>
+                    </div>
                   </div>
+                  <div className="text-gray-400 text-sm font-medium">Win Rate</div>
                 </div>
                 
-                <div className="bg-gray-900 rounded-lg p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Win Rate</span>
-                    <span className="text-poker-gold font-semibold">{userProfile?.win_rate || 0}%</span>
+                {/* Total Winnings */}
+                <div className="bg-gray-900 rounded-xl p-6 shadow-lg flex flex-col justify-center">
+                  <div className="text-gray-400 text-sm font-medium mb-2">Total Winnings</div>
+                  <div className="text-green-400 text-3xl font-bold">
+                    ${(userProfile?.total_winnings || 0).toLocaleString()}
                   </div>
+                  <div className="text-xs text-gray-500 mt-2">
+                    Avg: ${(userProfile?.avg_pot_won || 0).toLocaleString()} per pot
+                  </div>
+                </div>
+              </div>
+              
+              {/* Secondary Stats */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-gray-900 rounded-lg p-4 border-l-4 border-blue-500">
+                  <div className="text-gray-400 text-xs mb-1">Hands Played</div>
+                  <div className="text-white text-2xl font-bold">{userProfile?.hands_played || 0}</div>
                 </div>
                 
-                <div className="bg-gray-900 rounded-lg p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Total Winnings</span>
-                    <span className="text-white font-semibold">${userProfile?.total_winnings || 0}</span>
-                  </div>
+                <div className="bg-gray-900 rounded-lg p-4 border-l-4 border-green-500">
+                  <div className="text-gray-400 text-xs mb-1">Hands Won</div>
+                  <div className="text-white text-2xl font-bold">{userProfile?.hands_won || 0}</div>
                 </div>
-
-                <div className="bg-gray-900 rounded-lg p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Hands Played</span>
-                    <span className="text-white font-semibold">{userProfile?.hands_played || 0}</span>
-                  </div>
-                </div>
-
-                <div className="bg-gray-900 rounded-lg p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Avg Pot Won</span>
-                    <span className="text-white font-semibold">${userProfile?.avg_pot_won || 0}</span>
+                
+                <div className="bg-gray-900 rounded-lg p-4 border-l-4 border-purple-500">
+                  <div className="text-gray-400 text-xs mb-1">Win/Hand</div>
+                  <div className="text-white text-2xl font-bold">
+                    {userProfile?.hands_played ? 
+                      `${((userProfile.hands_won / userProfile.hands_played) * 100).toFixed(1)}%` : 
+                      '0%'
+                    }
                   </div>
                 </div>
               </div>

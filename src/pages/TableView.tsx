@@ -520,289 +520,326 @@ useEffect(() => {
       )}
 
       {/* Main Table Area */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      {/* Main Table Area */}
+      <main className="w-full px-6 pt-8 pb-4">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Poker Table */}
           <div className="lg:col-span-3">
-            <div className="relative bg-gradient-to-br from-green-800 to-green-900 rounded-full aspect-[4/3] border-8 border-yellow-600 shadow-2xl">
-              {/* Community Cards Area */}
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                <div className="text-center mb-4">
-                  {table.currentPot > 0 && (
-                    <div className="text-poker-gold font-bold text-2xl mb-2">
-                      Pot: {formatCurrency(table.currentPot)}
-                    </div>
-                  )}
-                  <div className="text-white font-semibold capitalize">
-                    {table.gamePhase}
-                  </div>
-                </div>
-                
-                {/* Community Cards */}
-                <div className="flex justify-center space-x-2">
-                  {table.communityCards && table.communityCards.length > 0 ? (
-                    table.communityCards.map((card, index) => (
-                      <img
-                        key={index}
-                        src={`/cards/${card}.svg`} // <-- uses public/cards
-                        alt={card}
-                        className="w-12 h-16 rounded border-2 border-gray-300 shadow-lg"
-                      />
-                    ))
-                  ) : null}
-
-                  {Array.from({ length: 5 - (table.communityCards?.length || 0) }).map((_, index) => (
-                    <div
-                      key={`placeholder-${index}`}
-                      className="w-12 h-16 bg-gray-600 rounded border-2 border-gray-500 opacity-30"
+            {/* Poker Table - REDESIGNED */}
+            <div className="relative bg-gray-900 rounded-full aspect-[5/2.8] shadow-2xl overflow-visible mb-6">
+              {/* Outer rail */}
+              <div className="absolute inset-0 rounded-full border-[16px] border-yellow-700 shadow-inner">
+                {/* Inner rail with gradient */}
+                <div className="absolute inset-0 rounded-full border-[8px] border-yellow-600 shadow-lg">
+                  {/* Felt surface */}
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-green-700 via-green-800 to-green-900 shadow-inner">
+                    {/* Felt texture overlay */}
+                    <div 
+                      className="absolute inset-0 rounded-full opacity-20"
+                      style={{
+                        backgroundImage: `repeating-linear-gradient(
+                          45deg,
+                          transparent,
+                          transparent 2px,
+                          rgba(0,0,0,0.1) 2px,
+                          rgba(0,0,0,0.1) 4px
+                        )`
+                      }}
                     />
-                  ))}
-                </div>
-              </div>
 
-              {/* Players positioned around table */}
-              {table.players.map((player) => {
-                const { x, y } = getPlayerPosition(player.position, table.maxPlayers);
-                const isCurrentUser = player.id === user?.id;
-                
-                return (
-                  <div
-                    key={player.id}
-                    className="absolute transform -translate-x-1/2 -translate-y-1/2"
-                    style={{ left: `${x}%`, top: `${y}%` }}
-                  >
-                    <div className={`text-center ${isCurrentUser ? 'ring-2 ring-poker-gold rounded-lg p-2' : ''}`}>
-                      <div className={`w-16 h-16 rounded-full border-4 ${
-                        player.isDealer ? 'border-poker-gold shadow-lg shadow-yellow-500/50' :
-                        player.isSmallBlind ? 'border-blue-400 shadow-lg shadow-blue-400/50' :
-                        player.isBigBlind ? 'border-red-400 shadow-lg shadow-red-400/50' :
-                        'border-gray-600'
-                      } bg-gradient-to-br from-poker-gold to-yellow-600 flex items-center justify-center mx-auto mb-2`}>
-                        <span className="text-gray-900 font-bold text-lg">
-                          {player.username.charAt(0).toUpperCase()}
-                        </span>
+                    {/* Community Cards Area */}
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
+                      <div className="text-center mb-2">
+                        {table.currentPot > 0 && (
+                          <div className="text-poker-gold font-bold text-xl mb-1 drop-shadow-lg">
+                            Pot: {formatCurrency(table.currentPot)}
+                          </div>
+                        )}
+                        <div className="text-white font-semibold text-sm capitalize drop-shadow-md">
+                          {table.gamePhase}
+                        </div>
                       </div>
                       
-                      <div className="text-white font-semibold text-sm mb-1">
-                        {player.username}
-                        {isCurrentUser && <span className="text-poker-gold ml-1">(You)</span>}
-                      </div>
-                      
-                      <div className="text-poker-gold font-bold text-sm">
-                        {formatCurrency(player.chips)}
-                      </div>
-                      
-                      <div className="text-xs mt-1 space-x-1">
-                        {player.isDealer && <span className="text-poker-gold bg-yellow-900 px-1 rounded">D</span>}
-                        {player.isSmallBlind && <span className="text-blue-400 bg-blue-900 px-1 rounded">SB</span>}
-                        {player.isBigBlind && <span className="text-red-400 bg-red-900 px-1 rounded">BB</span>}
-                      </div>
-
-                      {/* NO static cards shown during preflop if animation hasn't completed */}
-                      {table.gamePhase !== 'preflop' && isCurrentUser && player.cards && player.cards.length > 0 && (
-                        <div className="flex justify-center space-x-1 mt-2">
-                          {player.cards.map((card, index) => (
+                      {/* Community Cards */}
+                      <div className="flex justify-center space-x-2">
+                        {table.communityCards && table.communityCards.length > 0 ? (
+                          table.communityCards.map((card, index) => (
                             <img
                               key={index}
                               src={`/cards/${card}.svg`}
                               alt={card}
-                              className="w-8 h-10 rounded shadow-lg"
+                              className="w-12 h-16 rounded border-2 border-gray-300 shadow-lg"
                             />
-                          ))}
+                          ))
+                        ) : null}
+
+                        {Array.from({ length: 5 - (table.communityCards?.length || 0) }).map((_, index) => (
+                          <div
+                            key={`placeholder-${index}`}
+                            className="w-12 h-16 bg-gray-600 rounded border-2 border-gray-500 opacity-30"
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Players positioned around table */}
+                    {table.players.map((player) => {
+                      const { x, y } = getPlayerPosition(player.position, table.maxPlayers);
+                      const isCurrentUser = player.id === user?.id;
+                      
+                      return (
+                        <div
+                          key={player.id}
+                          className="absolute transform -translate-x-1/2 -translate-y-1/2 z-20"
+                          style={{ left: `${x}%`, top: `${y}%` }}
+                        >
+                          <div className={`text-center ${isCurrentUser ? 'bg-gray-800 bg-opacity-50 ring-2 ring-poker-gold rounded-lg p-3' : ''}`}>
+                            <div className={`w-16 h-16 rounded-full border-4 ${
+                              player.isDealer ? 'border-poker-gold shadow-lg shadow-yellow-500/50' :
+                              player.isSmallBlind ? 'border-blue-400 shadow-lg shadow-blue-400/50' :
+                              player.isBigBlind ? 'border-red-400 shadow-lg shadow-red-400/50' :
+                              'border-gray-600'
+                            } bg-gradient-to-br from-poker-gold to-yellow-600 flex items-center justify-center mx-auto mb-2`}>
+                              <span className="text-gray-900 font-bold text-lg">
+                                {player.username.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            
+                            <div className="text-white font-semibold text-sm mb-1 drop-shadow-md">
+                              {player.username}
+                              {isCurrentUser && <span className="text-poker-gold ml-1">(You)</span>}
+                            </div>
+                            
+                            <div className="text-poker-gold font-bold text-sm drop-shadow-md">
+                              {formatCurrency(player.chips)}
+                            </div>
+                            
+                            <div className="text-xs mt-1 space-x-1">
+                              {player.isDealer && <span className="text-poker-gold bg-yellow-900 px-1 rounded">D</span>}
+                              {player.isSmallBlind && <span className="text-blue-400 bg-blue-900 px-1 rounded">SB</span>}
+                              {player.isBigBlind && <span className="text-red-400 bg-red-900 px-1 rounded">BB</span>}
+                            </div>
+
+                            {/* NO static cards shown during preflop if animation hasn't completed */}
+                            {table.gamePhase !== 'preflop' && isCurrentUser && player.cards && player.cards.length > 0 && (
+                              <div className="flex justify-center space-x-1 mt-2">
+                                {player.cards.map((card, index) => (
+                                  <img
+                                    key={index}
+                                    src={`/cards/${card}.svg`}
+                                    alt={card}
+                                    className="w-12 h-16 rounded shadow-lg"
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Animated hole cards - positioned exactly where static cards would be */}
+                    {animatedCards.map(({ playerId, card, index }, animIndex) => {
+                      const player = table.players.find(p => p.id === playerId);
+                      if (!player) return null;
+                      
+                      const { x, y, offsetX } = getCardPosition(player.position, index, table.maxPlayers);
+                      const isCurrentUser = player.id === user?.id;
+                      
+                      // Show face-up cards for current user, face-down for others
+                      const cardSrc = isCurrentUser && card !== 'card_back' ? `/cards/${card}.svg` : '/cards/card_back.png';
+
+                      return (
+                        <motion.div
+                          key={`${playerId}-${index}-${animIndex}`}
+                          className="absolute w-12 h-16 pointer-events-none z-30"
+                          initial={{ 
+                            left: `${deckPosition.x}%`, 
+                            top: `${deckPosition.y}%`,
+                            x: '-50%',
+                            y: '-50%',
+                            scale: 0.9,
+                            rotate: Math.random() * 10 - 5,
+                            zIndex: 100 + animIndex
+                          }}
+                          animate={{ 
+                            left: `${x}%`, 
+                            top: `${y}%`,
+                            x: `calc(-50% + ${offsetX}px)`,
+                            y: '-50%',
+                            scale: 1,
+                            rotate: Math.random() * 4 - 2,
+                          }}
+                          transition={{ 
+                            duration: 0.6,
+                            ease: "easeOut",
+                            delay: 0
+                          }}
+                          style={{
+                            transformOrigin: 'center center'
+                          }}
+                        >
+                          <img
+                            src={cardSrc}
+                            alt={isCurrentUser && card !== 'back' ? card : 'face-down card'}
+                            className="w-full h-full rounded shadow-lg border border-gray-300"
+                          />
+                        </motion.div>
+                      );
+                    })}
+                    
+                    {/* Empty seats - show at positions not occupied by players */}
+                    {Array.from({ length: table.maxPlayers }).map((_, position) => {
+                      const isOccupied = table.players.some(p => p.position === position);
+                      
+                      if (isOccupied) return null;
+                      
+                      const { x, y } = getPlayerPosition(position, table.maxPlayers);
+                      
+                      return (
+                        <div
+                          key={`empty-${position}`}
+                          className="absolute transform -translate-x-1/2 -translate-y-1/2 z-20"
+                          style={{ left: `${x}%`, top: `${y}%` }}
+                        >
+                          <div className="w-16 h-16 rounded-full border-4 border-dashed border-gray-600 flex items-center justify-center hover:border-gray-500 transition-colors cursor-pointer">
+                            <span className="text-gray-500 text-2xl">+</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* NEW: Action Buttons - REDESIGNED */}
+            {/* NEW: Action Buttons - REDESIGNED */}
+            {isPlayer && table.status === 'active' && table.gamePhase !== 'finished' && (
+              <div className="mt-6">
+                {/* Player Status Card with Buttons on One Line */}
+                <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-4 border border-gray-700 shadow-xl">
+                  <div className="flex items-center justify-between gap-6">
+                    {/* Left side - Status and Stats */}
+                    <div className="flex items-center gap-6 flex-1">
+                      <div className="text-white text-base font-semibold">
+                        {isMyTurn ? (
+                          <span className="flex items-center whitespace-nowrap">
+                            <span className="w-3 h-3 bg-green-400 rounded-full mr-2 animate-pulse"></span>
+                            <span className="text-green-400">Your Turn</span>
+                          </span>
+                        ) : (
+                          <span className="flex items-center whitespace-nowrap">
+                            <span className="w-3 h-3 bg-gray-500 rounded-full mr-2"></span>
+                            <span className="text-gray-400">Waiting for {currentPlayer?.username || 'other player'}</span>
+                          </span>
+                        )}
+                      </div>
+                      
+                      {myPlayer && (
+                        <div className="flex gap-3 text-sm">
+                          <div className="bg-gray-900 rounded-lg px-3 py-2 border border-gray-700">
+                            <div className="text-gray-400 text-xs">Your Chips</div>
+                            <div className="text-poker-gold font-bold whitespace-nowrap">{formatCurrency(myPlayer.chips)}</div>
+                          </div>
+                          <div className="bg-gray-900 rounded-lg px-3 py-2 border border-gray-700">
+                            <div className="text-gray-400 text-xs">Current Bet</div>
+                            <div className="text-white font-bold whitespace-nowrap">{formatCurrency(myPlayer.currentBet || 0)}</div>
+                          </div>
+                          {callAmount > 0 && (
+                            <div className="bg-gray-900 rounded-lg px-3 py-2 border border-yellow-700">
+                              <div className="text-gray-400 text-xs">To Call</div>
+                              <div className="text-yellow-400 font-bold whitespace-nowrap">{formatCurrency(callAmount)}</div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-                  </div>
-                );
-              })}
 
-              {/* Animated hole cards - positioned exactly where static cards would be */}
-              {animatedCards.map(({ playerId, card, index }, animIndex) => {
-                const player = table.players.find(p => p.id === playerId);
-                if (!player) return null;
-                
-                const { x, y, offsetX } = getCardPosition(player.position, index, table.maxPlayers);
-                const isCurrentUser = player.id === user?.id;
-                
-                // Show face-up cards for current user, face-down for others
-                const cardSrc = isCurrentUser && card !== 'card_back' ? `/cards/${card}.svg` : '/cards/card_back.png';
-
-                return (
-                  <motion.div
-                    key={`${playerId}-${index}-${animIndex}`}
-                    className="absolute w-8 h-10 pointer-events-none"
-                    initial={{ 
-                      left: `${deckPosition.x}%`, 
-                      top: `${deckPosition.y}%`,
-                      x: '-50%',
-                      y: '-50%',
-                      scale: 0.9,
-                      rotate: Math.random() * 10 - 5,
-                      zIndex: 100 + animIndex
-                    }}
-                    animate={{ 
-                      left: `${x}%`, 
-                      top: `${y}%`,
-                      x: `calc(-50% + ${offsetX}px)`, // This should match "space-x-1" spacing
-                      y: '-50%', // Keep centered vertically at the calculated position
-                      scale: 1,
-                      rotate: Math.random() * 4 - 2, // Less rotation for cleaner look
-                    }}
-                    transition={{ 
-                      duration: 0.6,
-                      ease: "easeOut",
-                      delay: 0
-                    }}
-                    style={{
-                      transformOrigin: 'center center'
-                    }}
-                  >
-                    <img
-                      src={cardSrc}
-                      alt={isCurrentUser && card !== 'back' ? card : 'face-down card'}
-                      className="w-full h-full rounded shadow-lg border border-gray-300"
-                    />
-                  </motion.div>
-                );
-              })}
-              
-            {/* Empty seats - show at positions not occupied by players */}
-            {Array.from({ length: table.maxPlayers }).map((_, position) => {
-              // Check if this position is occupied by a player
-              const isOccupied = table.players.some(p => p.position === position);
-              
-              if (isOccupied) return null; // Skip occupied positions
-              
-              const { x, y } = getPlayerPosition(position, table.maxPlayers);
-              
-              return (
-                <div
-                  key={`empty-${position}`}
-                  className="absolute transform -translate-x-1/2 -translate-y-1/2"
-                  style={{ left: `${x}%`, top: `${y}%` }}
-                >
-                  <div className="w-16 h-16 rounded-full border-4 border-dashed border-gray-600 flex items-center justify-center hover:border-gray-500 transition-colors cursor-pointer">
-                    <span className="text-gray-500 text-2xl">+</span>
-                  </div>
-                </div>
-              );
-            })}
-            </div>
-
-            {/* NEW: Action Buttons */}
-            {isPlayer && table.status === 'active' && table.gamePhase !== 'finished' && (
-              <div className="mt-6">
-                <div className="bg-gray-800 rounded-lg p-4 mb-4 text-center">
-                  <div className="text-white mb-2">
-                    {isMyTurn ? (
-                      <span className="text-green-400 font-bold">Your Turn</span>
-                    ) : (
-                      <span className="text-gray-400">
-                        Waiting for {currentPlayer?.username || 'other player'}
-                      </span>
-                    )}
-                  </div>
-                  
-                  {myPlayer && (
-                    <div className="text-sm text-gray-300 space-y-1">
-                      <div>Your chips: <span className="text-poker-gold font-bold">{formatCurrency(myPlayer.chips)}</span></div>
-                      <div>Current bet: <span className="text-white">{formatCurrency(myPlayer.currentBet || 0)}</span></div>
-                      {callAmount > 0 && (
-                        <div>To call: <span className="text-yellow-400">{formatCurrency(callAmount)}</span></div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {isMyTurn ? (
-                  <div className="flex flex-wrap justify-center gap-3">
-                    <Button
-                      onClick={handleFold}
-                      disabled={isActionLoading}
-                      variant="secondary"
-                      className="bg-red-600 hover:bg-red-700 min-w-20"
-                    >
-                      {isActionLoading ? '...' : 'Fold'}
-                    </Button>
-                    
-                    {isFacingBet ? (
-                      // Facing aggression: Check/Call or Raise
-                      <>
-                        {callAmount === 0 ? (
-                          <Button
-                            onClick={handleCheck}
-                            disabled={isActionLoading}
-                            variant="secondary"
-                            className="bg-blue-600 hover:bg-blue-700 min-w-20"
-                          >
-                            {isActionLoading ? '...' : 'Check'}
-                          </Button>
-                        ) : (
-                          <Button
-                            onClick={handleCall}
-                            disabled={isActionLoading}  // <-- ONLY disable during loading
-                            className="bg-green-600 hover:bg-green-700 min-w-20"
-                          >
-                            {isActionLoading ? '...' : 
-                              callAmount >= (myPlayer?.chips || 0)
-                                ? `Call All-In ${formatCurrency(myPlayer?.chips || 0)}`
-                                : `Call ${formatCurrency(callAmount)}`
-                            }
-                          </Button>
-                        )}
-                        
+                    {/* Right side - Action Buttons */}
+                    {isMyTurn && (
+                      <div className="flex gap-2 flex-shrink-0">
                         <Button
-                          onClick={() => {
-                            // Recalculate with current table data
-                            const currentBetNow = table.players.reduce((max, p) => Math.max(max, p.currentBet || 0), 0);
-                            const minRaiseIncrementNow = (table.lastRaiseAmount && table.lastRaiseAmount > 0) 
-                              ? table.lastRaiseAmount 
-                              : table.bigBlind;
-                            const minRaiseNow = currentBetNow + minRaiseIncrementNow;
-                            
-                            console.log('Opening raise modal:', {
-                              currentBetNow,
-                              lastRaiseAmount: table.lastRaiseAmount,
-                              minRaiseIncrementNow,
-                              minRaiseNow
-                            });
-                            
-                            setRaiseAmount(minRaiseNow);
-                            setShowRaiseModal(true);
-                          }}
-                          disabled={isActionLoading || (myPlayer?.chips || 0) <= callAmount}
-                          className="bg-orange-600 hover:bg-orange-700 min-w-20"
-                        >
-                          Raise
-                        </Button>
-                      </>
-                    ) : (
-                      // No aggression: Check or Bet
-                      <>
-                        <Button
-                          onClick={handleCheck}
+                          onClick={handleFold}
                           disabled={isActionLoading}
                           variant="secondary"
-                          className="bg-blue-600 hover:bg-blue-700 min-w-20"
+                          className="bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-red-500"
                         >
-                          {isActionLoading ? '...' : 'Check'}
+                          {isActionLoading ? '...' : 'Fold'}
                         </Button>
                         
-                        <Button
-                          onClick={() => {
-                            setRaiseAmount(table.bigBlind); // Set to minimum valid bet
-                            setShowRaiseModal(true);
-                          }}
-                          disabled={isActionLoading || (myPlayer?.chips || 0) === 0}
-                          className="bg-orange-600 hover:bg-orange-700 min-w-20"
-                        >
-                          Bet
-                        </Button>
-                      </>
+                        {isFacingBet ? (
+                          <>
+                            {callAmount === 0 ? (
+                              <Button
+                                onClick={handleCheck}
+                                disabled={isActionLoading}
+                                variant="secondary"
+                                className="bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-blue-500"
+                              >
+                                {isActionLoading ? '...' : 'Check'}
+                              </Button>
+                            ) : (
+                              <Button
+                                onClick={handleCall}
+                                disabled={isActionLoading}
+                                className="bg-gradient-to-br from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 min-w-24 py-2 text-sm font-semibold shadow-lg border-2 border-green-500"
+                              >
+                                {isActionLoading ? '...' : 
+                                  callAmount >= (myPlayer?.chips || 0)
+                                    ? `All-In ${formatCurrency(myPlayer?.chips || 0)}`
+                                    : `Call ${formatCurrency(callAmount)}`
+                                }
+                              </Button>
+                            )}
+                            
+                            <Button
+                              onClick={() => {
+                                const currentBetNow = table.players.reduce((max, p) => Math.max(max, p.currentBet || 0), 0);
+                                const minRaiseIncrementNow = (table.lastRaiseAmount && table.lastRaiseAmount > 0) 
+                                  ? table.lastRaiseAmount 
+                                  : table.bigBlind;
+                                const minRaiseNow = currentBetNow + minRaiseIncrementNow;
+                                
+                                setRaiseAmount(minRaiseNow);
+                                setShowRaiseModal(true);
+                              }}
+                              disabled={isActionLoading || (myPlayer?.chips || 0) <= callAmount}
+                              className="bg-gradient-to-br from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-orange-500"
+                            >
+                              Raise
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              onClick={handleCheck}
+                              disabled={isActionLoading}
+                              variant="secondary"
+                              className="bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-blue-500"
+                            >
+                              {isActionLoading ? '...' : 'Check'}
+                            </Button>
+                            
+                            <Button
+                              onClick={() => {
+                                setRaiseAmount(table.bigBlind);
+                                setShowRaiseModal(true);
+                              }}
+                              disabled={isActionLoading || (myPlayer?.chips || 0) === 0}
+                              className="bg-gradient-to-br from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-orange-500"
+                            >
+                              Bet
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
-                ) : (
-                  <div className="text-center text-gray-400 py-4">
+                </div>
+                
+                {!isMyTurn && (
+                  <div className="text-center text-gray-400 py-3 bg-gray-800 rounded-xl border border-gray-700 mt-3">
                     Wait for your turn to act
                   </div>
                 )}
@@ -811,7 +848,6 @@ useEffect(() => {
             
             {/* Bet/Raise Modal */}
             {showRaiseModal && (() => {
-              // Recalculate values with fresh table data when modal renders
               const currentBetNow = table.players.reduce((max, p) => Math.max(max, p.currentBet || 0), 0);
               const myPlayerNow = table.players.find(p => String(p.id) === String(user?.id));
               const isFacingBetNow = currentBetNow > 0;
@@ -850,12 +886,10 @@ useEffect(() => {
                           value={raiseAmount}
                           onChange={(e) => {
                             const inputValue = Number(e.target.value);
-                            // Cap at maximum available chips
                             const cappedValue = Math.min(inputValue, maxAmount);
                             setRaiseAmount(cappedValue);
                           }}
                           onBlur={(e) => {
-                            // On blur, ensure value is within valid range
                             const inputValue = Number(e.target.value);
                             const minValue = isFacingBetNow ? minRaiseNow : table.bigBlind;
                             if (inputValue > maxAmount) {
@@ -1015,42 +1049,6 @@ useEffect(() => {
                 )}
               </div>
             </div>
-
-            {/* AI Insights Panel */}
-            {/* <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">AI Insights</h3>
-              {isPlayer ? (
-                <div className="space-y-3">
-                  <div className="bg-blue-900 rounded p-3">
-                    <div className="text-blue-200 text-sm font-medium mb-1">Hand Strength</div>
-                    <div className="text-white font-bold">Calculating...</div>
-                  </div>
-                  <div className="bg-green-900 rounded p-3">
-                    <div className="text-green-200 text-sm font-medium mb-1">Recommended Action</div>
-                    <div className="text-white font-bold">Analyzing...</div>
-                  </div>
-                  <div className="bg-yellow-900 rounded p-3">
-                    <div className="text-yellow-200 text-sm font-medium mb-1">Pot Odds</div>
-                    <div className="text-white font-bold">
-                      {table.currentPot > 0 ? 'Calculating...' : 'N/A'}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-gray-400 text-center py-4">
-                  Join as a player to receive AI insights and recommendations
-                </div>
-              )}
-            </div> */}
-
-            {/* Hand History Button */}
-            {/* <Button
-              onClick={() => setShowHandHistory(true)}
-              variant="secondary"
-              className="w-full"
-            >
-              📊 View Hand History
-            </Button> */}
 
             {/* Spectators List */}
             {table.spectatorList && table.spectatorList.length > 0 && (

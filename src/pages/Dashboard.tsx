@@ -138,7 +138,7 @@ export const Dashboard: React.FC = () => {
               <span className="text-2xl">♠️</span>
             </div>
             <div className="text-2xl font-bold bg-gradient-to-r from-poker-gold to-yellow-400 bg-clip-text text-transparent">
-              PokerAI Pro
+              Poker Review
             </div>
           </div>
           
