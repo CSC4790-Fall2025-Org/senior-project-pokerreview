@@ -830,7 +830,14 @@ class PokerGame {
         return;
     }
 
-    this.currentPlayerIndex = this.getNextActivePlayer((this.dealerPosition + 1) % this.players.length);
+    // ✅ FIX: Set correct starting player for post-flop action
+    if (this.players.length === 2) {
+      // Heads-up POST-FLOP: Dealer acts FIRST (button has position)
+      this.currentPlayerIndex = this.dealerPosition;
+    } else {
+      // 3+ players POST-FLOP: Player to left of dealer acts first
+      this.currentPlayerIndex = this.getNextActivePlayer((this.dealerPosition + 1) % this.players.length);
+    }
     
     if (this.currentPlayerIndex === -1) {
       this.currentPlayerIndex = this.getNextActivePlayer(0);
@@ -838,6 +845,7 @@ class PokerGame {
     
     console.log(`Next phase: ${this.gamePhase}, Current player: ${this.currentPlayerIndex >= 0 ? this.players[this.currentPlayerIndex].username : 'none'}`);
   }
+
 
   dealFlop() {
     this.deck.deal(1);
