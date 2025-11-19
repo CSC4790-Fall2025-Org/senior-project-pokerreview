@@ -710,8 +710,11 @@ useEffect(() => {
 
             {/* NEW: Action Buttons - REDESIGNED */}
             {/* NEW: Action Buttons - REDESIGNED */}
-            {isPlayer && table.status === 'active' && table.gamePhase !== 'finished' && (
-              <div className="mt-6">
+            {isPlayer && 
+              table.status === 'active' && 
+              table.gamePhase !== 'finished' && 
+              table.gamePhase !== 'showdown' && ( 
+                <div className="mt-6">
                 {/* Player Status Card with Buttons on One Line */}
                 <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-4 border border-gray-700 shadow-xl">
                   <div className="flex items-center justify-between gap-6">
