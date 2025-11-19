@@ -205,41 +205,41 @@ export const HandHistory: React.FC<HandHistoryProps> = ({ isOpen, onClose }) => 
                   </div>
                 )}
 
-                {/* Action Timeline */}
-                <div className="bg-gray-900 rounded-lg p-4">
-                  <h3 className="text-lg font-bold text-white mb-3">Action Timeline</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedHand.actions?.map((action: any, index: number) => (
-                      <div
-                        key={index}
-                        className={`p-2 rounded ${
-                          action.player === 'game' ? 'bg-blue-900' : 'bg-gray-800'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <span className={`font-semibold ${
-                              action.player === 'game' ? 'text-blue-300' : 'text-white'
-                            }`}>
-                              {action.player}
-                            </span>
-                            {' - '}
-                            <span className="text-gray-300">{action.action}</span>
+                {/* Showdown Results - NEW SECTION */}
+                {selectedHand.actions?.some((a: any) => a.handDisplay) && (
+                  <div className="bg-gray-900 rounded-lg p-4">
+                    <h3 className="text-lg font-bold text-white mb-3">Showdown</h3>
+                    <div className="space-y-3">
+                      {selectedHand.actions
+                        ?.filter((action: any) => action.action?.includes('wins') && action.winningHand)
+                        .map((winAction: any, index: number) => (
+                          <div key={index} className="bg-green-900 bg-opacity-30 p-3 rounded-lg border-2 border-green-500">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <span className="text-green-300 font-bold text-lg">{winAction.player}</span>
+                                <span className="text-gray-300 ml-2">wins {formatCurrency(winAction.pot)}</span>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-yellow-400 font-semibold">{winAction.handDescription}</div>
+                                <div className="text-green-300 text-xl font-mono">{winAction.handDisplay}</div>
+                              </div>
+                            </div>
+                            <div className="flex gap-1 justify-center">
+                              {winAction.winningHand.map((card: string, i: number) => (
+                                <img
+                                  key={i}
+                                  src={`/cards/${card}.svg`}
+                                  alt={card}
+                                  className="w-12 h-16 rounded shadow-lg"
+                                />
+                              ))}
+                            </div>
                           </div>
-                          <div className="text-gray-400 text-xs">
-                            Pot: {formatCurrency(action.pot)}
-                          </div>
-                        </div>
-                        {action.phase !== 'preflop' && (
-                          <div className="text-xs text-gray-500 mt-1 capitalize">
-                            {action.phase}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                        ))}
+                    </div>
                   </div>
-                </div>
-
+                )}
+                
                 {/* Players & Results */}
                 <div className="bg-gray-900 rounded-lg p-4">
                   <h3 className="text-lg font-bold text-white mb-3">Players & Results</h3>

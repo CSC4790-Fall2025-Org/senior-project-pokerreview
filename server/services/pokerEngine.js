@@ -295,8 +295,9 @@ class PokerGame {
     if (this.currentPlayerIndex >= 0) {
       console.log(`Current player: ${this.players[this.currentPlayerIndex].username}`);
     }
-    
-    this.logAction('game', 'New hand started');
+
+    // Log preflop begins AFTER setup is complete
+    this.logAction('game', 'Preflop begins');
     return this.getGameState();
   }
 
@@ -438,7 +439,13 @@ class PokerGame {
     player.hasActed = true;
     player.action = action;
     
-    this.logAction(player.username, `${action}${amount ? ` $${amount}` : ''}`);
+    // Enhanced logging - include amount for all actions that involve chips
+    let logMessage = action;
+    if (actionResult.amount && actionResult.amount > 0) {
+      logMessage = `${action} $${actionResult.amount}`;
+    }
+    
+    this.logAction(player.username, logMessage);
     
     this.advanceGame();
     
@@ -474,6 +481,7 @@ class PokerGame {
     if (this.currentBet > player.currentBet) {
       throw new Error('Cannot check - must call or fold');
     }
+    
     return { action: 'check' };
   }
 
@@ -627,9 +635,33 @@ class PokerGame {
     
     if (this.isBettingRoundComplete()) {
       const playersNotAllIn = activePlayers.filter(p => !p.isAllIn);
+      
+      // ✅ If all players are all-in OR only one can act, deal remaining cards and showdown
       if (playersNotAllIn.length <= 1) {
         console.log('All players all-in or only one can act, going to showdown');
-        this.dealRemainingCards();
+        
+        // Deal all remaining community cards
+        while (this.communityCards.length < 5) {
+          this.deck.deal(1); // Burn
+          const card = this.deck.deal(1)[0];
+          this.communityCards.push(card);
+          
+          // Update hand log
+          if (this.currentHandLog) {
+            if (this.communityCards.length === 3) {
+              this.currentHandLog.boardCards.flop = this.communityCards.slice(0, 3).map(c => c.toString());
+              this.logAction('game', 'Flop dealt');
+            } else if (this.communityCards.length === 4) {
+              this.currentHandLog.boardCards.turn = card.toString();
+              this.logAction('game', 'Turn dealt');
+            } else if (this.communityCards.length === 5) {
+              this.currentHandLog.boardCards.river = card.toString();
+              this.logAction('game', 'River dealt');
+            }
+          }
+        }
+        
+        this.gamePhase = 'showdown';
         this.showdown();
         return;
       }
@@ -639,6 +671,7 @@ class PokerGame {
       this.nextPlayer();
     }
   }
+  
 
   endHandEarly(winner) {
   // Finalize the hand log BEFORE doing anything else
@@ -654,7 +687,13 @@ class PokerGame {
   }
   
   winner.chips += this.pot;
-  this.logAction(winner.username, `wins $${this.pot} (all others folded)`);
+  this.logAction(
+    winner.username, 
+    `wins $${this.pot} (all others folded)`,
+    {
+      pot: this.pot
+    }
+  );
   this.gamePhase = 'finished';
   
   console.log(`Hand finished. Winner: ${winner.username}`);
@@ -800,6 +839,7 @@ class PokerGame {
   }
 
   nextPhase() {
+    // Reset player states FIRST
     this.players.forEach(player => {
       player.hasActed = false;
       player.currentBet = 0;
@@ -807,35 +847,40 @@ class PokerGame {
     this.currentBet = 0;
     this.lastRaiseAmount = 0;
     this.bettingRound++;
-
+  
     switch (this.gamePhase) {
       case 'preflop':
         this.gamePhase = 'flop';
         this.dealFlop();
+        this.logAction('game', 'Flop begins');
         break;
       case 'flop':
         this.gamePhase = 'turn';
         this.dealTurn();
+        this.logAction('game', 'Turn begins');
         break;
       case 'turn':
         this.gamePhase = 'river';
         this.dealRiver();
+        this.logAction('game', 'River begins');
         break;
       case 'river':
         this.gamePhase = 'showdown';
         this.showdown();
-        return;
+        return; // DON'T set currentPlayerIndex after showdown!
       default:
         this.startNewHand();
         return;
     }
-
-    // ✅ FIX: Set correct starting player for post-flop action
+  
+    // In heads-up, Big Blind (non-dealer) acts first post-flop
+    // In multi-way (3+), small blind position acts first
     if (this.players.length === 2) {
-      // Heads-up POST-FLOP: Dealer acts FIRST (button has position)
-      this.currentPlayerIndex = this.dealerPosition;
+      // Heads-up: Big Blind acts first post-flop (the player who is NOT the dealer)
+      const bigBlindPosition = (this.dealerPosition + 1) % this.players.length;
+      this.currentPlayerIndex = bigBlindPosition;
     } else {
-      // 3+ players POST-FLOP: Player to left of dealer acts first
+      // Multi-way: First active player after dealer acts first
       this.currentPlayerIndex = this.getNextActivePlayer((this.dealerPosition + 1) % this.players.length);
     }
     
@@ -848,7 +893,7 @@ class PokerGame {
 
 
   dealFlop() {
-    this.deck.deal(1);
+    this.deck.deal(1); // Burn card
     const flopCards = this.deck.deal(3);
     this.communityCards.push(...flopCards);
     
@@ -856,11 +901,11 @@ class PokerGame {
       this.currentHandLog.boardCards.flop = flopCards.map(c => c.toString());
     }
     
-    this.logAction('game', 'Flop dealt');
+    // logging is done in nextPhase()
   }
 
   dealTurn() {
-    this.deck.deal(1);
+    this.deck.deal(1); // Burn card
     const turnCard = this.deck.deal(1)[0];
     this.communityCards.push(turnCard);
     
@@ -868,27 +913,35 @@ class PokerGame {
       this.currentHandLog.boardCards.turn = turnCard.toString();
     }
     
-    this.logAction('game', 'Turn dealt');
   }
 
   dealRiver() {
-    this.deck.deal(1);
+    this.deck.deal(1); // Burn card
     const riverCard = this.deck.deal(1)[0];
     this.communityCards.push(riverCard);
     
     if (this.currentHandLog) {
       this.currentHandLog.boardCards.river = riverCard.toString();
     }
-    
-    this.logAction('game', 'River dealt');
   }
 
   showdown() {
     const activePlayers = this.getActivePlayers();
     
+    // Log showdown at the START
+    this.logAction('game', 'Showdown');
+    
     if (activePlayers.length === 1) {
       activePlayers[0].chips += this.pot;
-      this.logAction(activePlayers[0].username, `wins $${this.pot} (no showdown)`);
+      this.logAction(
+        activePlayers[0].username, 
+        `wins $${this.pot} (no showdown)`,
+        {
+          pot: this.pot,
+          handDescription: 'No showdown',
+          handDisplay: 'Won uncontested'
+        }
+      );
     } else {
       this.evaluateShowdown(activePlayers);
     }
@@ -905,12 +958,15 @@ class PokerGame {
     }
     
     this.gamePhase = 'finished';
+    // ✅ DO NOT set currentPlayerIndex here - game is over!
+    this.currentPlayerIndex = -1;
   }
 
   evaluateShowdown(players) {
     const playerHands = players.map(player => ({
       player,
-      hand: HandEvaluator.evaluateHand([...player.cards, ...this.communityCards])
+      hand: HandEvaluator.evaluateHand([...player.cards, ...this.communityCards]),
+      allCards: [...player.cards, ...this.communityCards]
     }));
 
     playerHands.sort((a, b) => {
@@ -935,9 +991,26 @@ class PokerGame {
     );
 
     const winAmount = Math.floor(this.pot / winners.length);
-    winners.forEach(winner => {
-      winner.player.chips += winAmount;
-      this.logAction(winner.player.username, `wins $${winAmount} with ${winner.hand.name}`);
+    winners.forEach(winnerObj => {
+      winnerObj.player.chips += winAmount;
+      
+      // Find the actual 5-card combination that makes the winning hand
+      const bestFiveCards = this.findBestFiveCards(winnerObj.allCards, winnerObj.hand);
+      
+      // Format as simple rank strings (e.g., "KKK88", "A5432")
+      const handDisplay = this.formatHandForDisplay(bestFiveCards, winnerObj.hand);
+      
+      // Log with hand details - THIS IS CRITICAL
+      this.logAction(
+        winnerObj.player.username, 
+        `wins $${winAmount} with ${winnerObj.hand.name} (${handDisplay})`,
+        {
+          handDescription: winnerObj.hand.name,
+          winningHand: bestFiveCards.map(c => c.toString()),
+          handDisplay: handDisplay,
+          pot: winAmount
+        }
+      );
     });
     // Log showdown results
     if (this.currentHandLog) {
@@ -1025,6 +1098,54 @@ class PokerGame {
     }
     
     console.log(`[${this.tableId}] ${player}: ${action} (Pot: $${this.pot})`);
+  }
+
+  // Find the actual 5 cards that make up the best hand
+  findBestFiveCards(allCards, bestHand) {
+    // Get all possible 5-card combinations
+    const combinations = HandEvaluator.getCombinations(allCards, 5);
+    
+    // Find the combination that matches our best hand ranking
+    for (const combo of combinations) {
+      const comboRank = HandEvaluator.rankHand(combo);
+      
+      // Check if this combination matches our best hand
+      if (comboRank.rank === bestHand.rank && 
+          JSON.stringify(comboRank.cards) === JSON.stringify(bestHand.cards)) {
+        return combo;
+      }
+    }
+    
+    // Fallback: return first 5 cards (shouldn't happen)
+    return allCards.slice(0, 5);
+  }
+
+  // Format hand for simple display (e.g., "KKK88", "AKQJ10")
+  formatHandForDisplay(fiveCards, handInfo) {
+    // Sort cards by value (high to low)
+    const sorted = [...fiveCards].sort((a, b) => b.getValue() - a.getValue());
+    
+    // For pairs, three of a kind, etc., we want to show the paired cards first
+    if (handInfo.name.includes('Pair') || handInfo.name.includes('Kind') || handInfo.name.includes('Full House')) {
+      // Count occurrences of each rank
+      const rankCounts = {};
+      sorted.forEach(card => {
+        const rank = card.rank;
+        rankCounts[rank] = (rankCounts[rank] || 0) + 1;
+      });
+      
+      // Sort by count (descending), then by value (descending)
+      const sortedByCount = sorted.sort((a, b) => {
+        const countDiff = rankCounts[b.rank] - rankCounts[a.rank];
+        if (countDiff !== 0) return countDiff;
+        return b.getValue() - a.getValue();
+      });
+      
+      return sortedByCount.map(c => c.rank).join('');
+    }
+    
+    // For straights and flushes, just show high to low
+    return sorted.map(c => c.rank).join('');
   }
 }
 

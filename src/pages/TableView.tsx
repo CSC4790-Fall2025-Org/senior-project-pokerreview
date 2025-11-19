@@ -29,7 +29,6 @@ const JoinAsPlayerModal: React.FC<JoinAsPlayerModalProps> = ({
 }) => {
   const [buyInAmount, setBuyInAmount] = useState(minBuyIn);
   const [error, setError] = useState<string | null>(null);
-  const [gameEvents, setGameEvents] = useState<Array<{message: string, timestamp: Date, type: string}>>([]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,82 +200,78 @@ export const TableView: React.FC = () => {
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [showRaiseModal, setShowRaiseModal] = useState(false);
   const [raiseAmount, setRaiseAmount] = useState(20);
- const [gameEvents, setGameEvents] = useState<Array<{message: string, timestamp: Date, type: string}>>([]);
-
-
+  const [gameEvents, setGameEvents] = useState<Array<{
+    message: string;
+    timestamp: Date;
+    type: string;
+    cards?: string;
+  }>>([]);
+  
   // Load table data
   useEffect(() => {
     if (!tableId) {
       navigate('/dashboard');
       return;
     }
-
+  
     loadTable();
     // Refresh table data every 10 seconds
     const interval = setInterval(loadTable, 10000);
     return () => clearInterval(interval);
   }, [tableId, navigate]);
-
-  // Track game events
-  // Track game events
-  useEffect(() => {
-  if (!table) return;
   
-  // Add event when game phase changes
-  if (table.gamePhase && table.gamePhase !== 'waiting') {
-    const phaseKey = `phase-${table.gamePhase}`;
-    const phaseMessage = `${table.gamePhase.charAt(0).toUpperCase() + table.gamePhase.slice(1)} begins`;
-    
-    if (!seenEventsRef.current.has(phaseKey)) {
-      seenEventsRef.current.add(phaseKey);
-      setGameEvents((prev) => [...prev, {
-        message: phaseMessage,
-        timestamp: new Date(),
-        type: 'phase'
-      }]);
+  // ✅ FIXED: Track game events directly from gameHistory (single source of truth)
+useEffect(() => {
+  if (!table?.gameHistory || !Array.isArray(table.gameHistory)) return;
+  
+  // Convert gameHistory to display events
+  const displayEvents = table.gameHistory.map((historyEntry: any) => {
+    // Determine event type
+    let eventType = 'action';
+    if (historyEntry.action.includes('wins')) {
+      eventType = 'win';
+    } else if (historyEntry.action.includes('fold')) {
+      eventType = 'fold';
+    } else if (historyEntry.action.includes('raise') || historyEntry.action.includes('bet')) {
+      eventType = 'bet';
+    } else if (historyEntry.action.includes('begins')) {
+      eventType = 'phase';
     }
-  }
+    
+    // Build the message - format properly based on who the player is
+    let message = historyEntry.action;
+    if (historyEntry.player && historyEntry.player !== 'game') {
+      message = `${historyEntry.player} ${historyEntry.action}`;
+    } else if (historyEntry.player === 'game') {
+      // For game events like "Flop begins", just show the action
+      message = historyEntry.action;
+    }
+    
+    return {
+      message,
+      timestamp: historyEntry.timestamp ? new Date(historyEntry.timestamp) : new Date(),
+      type: eventType,
+      cards: historyEntry.winningHand ? historyEntry.winningHand.join(' ') : undefined
+    };
+  });
   
-  // Track player actions from the table state
-  if (table.players && Array.isArray(table.players)) {
-    table.players.forEach(player => {
-      const playerAction = (player as any).action;
-      const playerCurrentBet = (player as any).currentBet;
-      
-      if (playerAction) {
-        // Create unique key for this action to prevent duplicates
-        const actionKey = `${player.id}-${playerAction}-${playerCurrentBet || 0}-${table.gamePhase}`;
-        
-        if (!seenEventsRef.current.has(actionKey)) {
-          seenEventsRef.current.add(actionKey);
-          
-          const actionMessage = `${player.username} ${playerAction}${
-            playerCurrentBet && playerCurrentBet > 0 ? ` $${playerCurrentBet}` : ''
-          }`;
-          
-          const actionType = playerAction.indexOf('fold') !== -1 ? 'fold' : 
-                            playerAction.indexOf('raise') !== -1 || playerAction.indexOf('bet') !== -1 ? 'bet' : 'action';
-          
-          setGameEvents((prev) => [...prev, {
-            message: actionMessage,
-            timestamp: new Date(),
-            type: actionType
-          }]);
-        }
-      }
-    });
-  }
-}, [table?.gamePhase, table?.players]); // Remove gameEvents from dependencies
+  setGameEvents(displayEvents);
+}, [table?.gameHistory]);
 
+// Reset events when new hand starts
 useEffect(() => {
   if (table?.gamePhase === 'waiting' && gameEvents.length > 0) {
-    seenEventsRef.current.clear();
-    // Add a separator event before clearing
-    setGameEvents((prev) => [...prev, {
-      message: '━━━━━━ New Hand Starting ━━━━━━',
-      timestamp: new Date(),
-      type: 'separator'
-    }]);
+    const separatorKey = `separator-${Date.now()}`;
+    if (!seenEventsRef.current.has(separatorKey)) {
+      seenEventsRef.current.clear(); // Clear old keys
+      seenEventsRef.current.add(separatorKey);
+      
+      setGameEvents((prev) => [...prev, {
+        message: '━━━━━━ New Hand Starting ━━━━━━',
+        timestamp: new Date(),
+        type: 'separator'
+      }]);
+    }
   }
 }, [table?.gamePhase, gameEvents.length]);
 
@@ -1017,24 +1012,28 @@ useEffect(() => {
             </div>
 
             {/* Game Events Log */}
-            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Game Events</h3>
-              <div className="space-y-2 max-h-80 overflow-y-auto">
-                {gameEvents.length > 0 ? (
-                  gameEvents.slice().reverse().map((event, index) => (
-                    <div
-                      key={index}
-                      className={`p-2 rounded text-sm ${
-                        event.type === 'separator' ? 'bg-gray-700 border-t-2 border-poker-gold text-center' :
-                        event.type === 'bet' ? 'bg-orange-900' :
-                        event.type === 'win' ? 'bg-green-900' :
-                        event.type === 'fold' ? 'bg-red-900' :
-                        'bg-gray-900'
-                      }`}
-                    >
-                      <div className={`${event.type === 'separator' ? 'text-poker-gold font-bold' : 'text-white'}`}>
-                        {event.message}
-                      </div>
+<div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+  <h3 className="text-lg font-semibold text-white mb-4">Game Events</h3>
+  <div className="space-y-2 max-h-80 overflow-y-auto">
+    {gameEvents.length > 0 ? (
+      gameEvents.slice().reverse().map((event, index) => (
+        <div
+          key={index}
+          className={`p-2 rounded text-sm ${
+            event.type === 'separator' ? 'bg-gray-700 border-t-2 border-poker-gold text-center' :
+            event.type === 'win' ? 'bg-gradient-to-r from-yellow-900 to-green-900 border-2 border-poker-gold' :
+            event.type === 'bet' ? 'bg-orange-900' :
+            event.type === 'fold' ? 'bg-red-900' :
+            'bg-gray-900'
+          }`}
+        >
+          <div className={`${
+            event.type === 'separator' ? 'text-poker-gold font-bold' : 
+            event.type === 'win' ? 'text-yellow-200 font-bold text-base' :
+            'text-white'
+          }`}>
+            {event.type === 'win' && '🏆 '}{event.message}
+          </div>
                       {event.type !== 'separator' && (
                         <div className="text-xs text-gray-400 mt-1">
                           {new Date(event.timestamp).toLocaleTimeString()}

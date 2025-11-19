@@ -170,6 +170,9 @@ class TableController {
       const userId = req.user.userId.toString();
       const isPlayer = table.players.some(p => p.id === userId);
       const isSpectator = table.spectators.some(s => s.id === userId);
+
+      const game = TableService.activeGames.get(tableId);
+      const gameState = game ? game.getGameState() : null;  
       
       const response = {
         id: table.id,
@@ -187,6 +190,7 @@ class TableController {
         dealerPosition: table.dealerPosition,
         currentPlayer: table.currentPlayer,
         lastRaiseAmount: table.lastRaiseAmount || 0, // Include last raise amount
+        gameHistory: gameState?.gameHistory || [],
         players: table.players.map(player => ({
           id: player.id,
           username: player.username,

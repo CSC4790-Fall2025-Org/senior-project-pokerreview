@@ -30,8 +30,8 @@ export interface TableData {
   name: string;
   gameType: string;
   maxPlayers: number;
-  currentPlayers: number; // Make this required, not optional
-  spectators: number; // Make this required, not optional
+  currentPlayers: number;
+  spectators: number;
   smallBlind: number;
   bigBlind: number;
   buyInMin: number;
@@ -42,10 +42,18 @@ export interface TableData {
   dealerPosition?: number;
   currentPlayer?: string;
   lastRaiseAmount?: number;
+  gameHistory?: Array<{  
+    player: string;
+    action: string;
+    pot?: number;
+    timestamp?: Date;
+    handDescription?: string;
+    winningHand?: string[];       // This will contain cards like ["K♠", "K♥", "K♦", "8♠", "8♥"]
+  }>;
   players: TablePlayer[];
   spectatorList?: TableSpectator[];
-  communityCards: string[]; // Make this required, not optional
-  userRole: 'player' | 'spectator' | 'none'; // Make this required, not optional
+  communityCards: string[];
+  userRole: 'player' | 'spectator' | 'none';
   createdAt: string;
   lastActivity: string;
 }
