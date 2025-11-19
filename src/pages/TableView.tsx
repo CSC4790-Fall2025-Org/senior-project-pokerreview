@@ -845,118 +845,136 @@ useEffect(() => {
             )}
             
             {/* Bet/Raise Modal */}
-            {showRaiseModal && (() => {
-              const currentBetNow = table.players.reduce((max, p) => Math.max(max, p.currentBet || 0), 0);
-              const myPlayerNow = table.players.find(p => String(p.id) === String(user?.id));
-              const isFacingBetNow = currentBetNow > 0;
-              const minRaiseIncrementNow = (table.lastRaiseAmount && table.lastRaiseAmount > 0) 
-                ? table.lastRaiseAmount 
-                : table.bigBlind;
-              const minRaiseNow = currentBetNow + minRaiseIncrementNow;
-              const maxAmount = myPlayerNow?.chips || 0;
+          {showRaiseModal && (() => {
+            const currentBetNow = table.players.reduce((max, p) => Math.max(max, p.currentBet || 0), 0);
+            const myPlayerNow = table.players.find(p => String(p.id) === String(user?.id));
+            const isFacingBetNow = currentBetNow > 0;
+            const minRaiseIncrementNow = (table.lastRaiseAmount && table.lastRaiseAmount > 0) 
+              ? table.lastRaiseAmount 
+              : table.bigBlind;
+            const minRaiseNow = currentBetNow + minRaiseIncrementNow;
+            const maxAmount = myPlayerNow?.chips || 0;
+            const currentPot = table.currentPot || 0; // ✅ Define pot in modal scope
               
-              return (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                  <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
-                    <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-xl font-bold text-white">
-                        {isFacingBetNow ? 'Raise Amount' : 'Bet Amount'}
-                      </h2>
+            return (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl font-bold text-white">
+                      {isFacingBetNow ? 'Raise Amount' : 'Bet Amount'}
+                    </h2>
+                    <button
+                      onClick={() => setShowRaiseModal(false)}
+                      className="text-gray-400 hover:text-white text-2xl"
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      {isFacingBetNow ? 'Raise to:' : 'Bet amount:'}
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">$</span>
+                      <input
+                        type="number"
+                        min={isFacingBetNow ? minRaiseNow : table.bigBlind}
+                        max={maxAmount}
+                        step={table.bigBlind}
+                        value={raiseAmount}
+                        onChange={(e) => {
+                          const inputValue = Number(e.target.value);
+                          const cappedValue = Math.min(inputValue, maxAmount);
+                          setRaiseAmount(cappedValue);
+                        }}
+                        onBlur={(e) => {
+                          const inputValue = Number(e.target.value);
+                          const minValue = isFacingBetNow ? minRaiseNow : table.bigBlind;
+                          if (inputValue > maxAmount) {
+                            setRaiseAmount(maxAmount);
+                          } else if (inputValue < minValue) {
+                            setRaiseAmount(minValue);
+                          }
+                        }}
+                        className="w-full pl-8 pr-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-poker-gold"
+                      />
+                    </div>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Min: {formatCurrency(isFacingBetNow ? minRaiseNow : table.bigBlind)} | Max: {formatCurrency(maxAmount)}
+                    </p>
+                    {isFacingBetNow && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        (Current bet: {formatCurrency(currentBetNow)} + Min raise: {formatCurrency(minRaiseIncrementNow)})
+                      </p>
+                    )}
+                    
+                    {/* Quick bet buttons */}
+                    <div className="flex gap-2 mt-3">
+                      {/* Min bet */}
                       <button
-                        onClick={() => setShowRaiseModal(false)}
-                        className="text-gray-400 hover:text-white text-2xl"
+                        onClick={() =>
+                          setRaiseAmount(isFacingBetNow ? minRaiseNow : table.bigBlind)
+                        }
+                        className="flex-1 px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded"
                       >
-                        ×
+                        Min
+                      </button>
+
+                      {/* 1/2 Pot - ✅ FIXED: Use currentPot from scope */}
+                      <button
+                        onClick={() => {
+                          const half = Math.floor(currentPot * 0.5);
+                          const minBet = isFacingBetNow ? minRaiseNow : table.bigBlind;
+                          setRaiseAmount(Math.min(Math.max(half, minBet), maxAmount));
+                        }}
+                        className="flex-1 px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded"
+                      >
+                        1/2 Pot
+                      </button>
+
+                      {/* 3/4 Pot - ✅ FIXED: Use currentPot from scope */}
+                      <button
+                        onClick={() => {
+                          const threeQuarter = Math.floor(currentPot * 0.75);
+                          const minBet = isFacingBetNow ? minRaiseNow : table.bigBlind;
+                          setRaiseAmount(Math.min(Math.max(threeQuarter, minBet), maxAmount));
+                        }}
+                        className="flex-1 px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded"
+                      >
+                        3/4 Pot
+                      </button>
+
+                      {/* All-In */}
+                      <button
+                        onClick={() => setRaiseAmount(maxAmount)}
+                        className="flex-1 px-3 py-1 bg-red-700 hover:bg-red-600 text-white text-sm rounded font-semibold"
+                      >
+                        All-In
                       </button>
                     </div>
+                  </div>
 
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        {isFacingBetNow ? 'Raise to:' : 'Bet amount:'}
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">$</span>
-                        <input
-                          type="number"
-                          min={isFacingBetNow ? minRaiseNow : table.bigBlind}
-                          max={maxAmount}
-                          step={table.bigBlind}
-                          value={raiseAmount}
-                          onChange={(e) => {
-                            const inputValue = Number(e.target.value);
-                            const cappedValue = Math.min(inputValue, maxAmount);
-                            setRaiseAmount(cappedValue);
-                          }}
-                          onBlur={(e) => {
-                            const inputValue = Number(e.target.value);
-                            const minValue = isFacingBetNow ? minRaiseNow : table.bigBlind;
-                            if (inputValue > maxAmount) {
-                              setRaiseAmount(maxAmount);
-                            } else if (inputValue < minValue) {
-                              setRaiseAmount(minValue);
-                            }
-                          }}
-                          className="w-full pl-8 pr-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-poker-gold"
-                        />
-                      </div>
-                      <p className="text-sm text-gray-400 mt-1">
-                        Min: {formatCurrency(isFacingBetNow ? minRaiseNow : table.bigBlind)} | Max: {formatCurrency(maxAmount)}
-                      </p>
-                      {isFacingBetNow && (
-                        <p className="text-xs text-gray-500 mt-2">
-                          (Current bet: {formatCurrency(currentBetNow)} + Min raise: {formatCurrency(minRaiseIncrementNow)})
-                        </p>
-                      )}
-                      
-                      {/* Quick bet buttons */}
-                      <div className="flex gap-2 mt-3">
-                        <button
-                          onClick={() => setRaiseAmount(isFacingBetNow ? minRaiseNow : table.bigBlind)}
-                          className="flex-1 px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded"
-                        >
-                          Min
-                        </button>
-                        <button
-                          onClick={() => setRaiseAmount(Math.floor((isFacingBetNow ? minRaiseNow : table.bigBlind) + (maxAmount - (isFacingBetNow ? minRaiseNow : table.bigBlind)) * 0.5))}
-                          className="flex-1 px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded"
-                        >
-                          1/2 Pot
-                        </button>
-                        <button
-                          onClick={() => setRaiseAmount(Math.floor((isFacingBetNow ? minRaiseNow : table.bigBlind) + (maxAmount - (isFacingBetNow ? minRaiseNow : table.bigBlind)) * 0.75))}
-                          className="flex-1 px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded"
-                        >
-                          3/4 Pot
-                        </button>
-                        <button
-                          onClick={() => setRaiseAmount(maxAmount)}
-                          className="flex-1 px-3 py-1 bg-red-700 hover:bg-red-600 text-white text-sm rounded font-semibold"
-                        >
-                          All-In
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex space-x-4">
-                      <Button 
-                        onClick={() => isFacingBetNow ? handleRaise(raiseAmount) : handleBet(raiseAmount)}
-                        disabled={raiseAmount < (isFacingBetNow ? minRaiseNow : table.bigBlind) || raiseAmount > maxAmount}
-                        className="flex-1"
-                      >
-                        {isFacingBetNow ? `Raise to ${formatCurrency(raiseAmount)}` : `Bet ${formatCurrency(raiseAmount)}`}
-                      </Button>
-                      <Button 
-                        variant="secondary" 
-                        onClick={() => setShowRaiseModal(false)} 
-                        className="flex-1"
-                      >
-                        Cancel
-                      </Button>
-                    </div>
+                  <div className="flex space-x-4">
+                    <Button 
+                      onClick={() => isFacingBetNow ? handleRaise(raiseAmount) : handleBet(raiseAmount)}
+                      disabled={raiseAmount < (isFacingBetNow ? minRaiseNow : table.bigBlind) || raiseAmount > maxAmount}
+                      className="flex-1"
+                    >
+                      {isFacingBetNow ? `Raise to ${formatCurrency(raiseAmount)}` : `Bet ${formatCurrency(raiseAmount)}`}
+                    </Button>
+                    <Button 
+                      variant="secondary" 
+                      onClick={() => setShowRaiseModal(false)} 
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
                   </div>
                 </div>
-              );
-            })()}
+              </div>
+            );
+          })()}
           </div>
 
           {/* Sidebar */}
