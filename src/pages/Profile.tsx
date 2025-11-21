@@ -105,7 +105,7 @@ export const Profile: React.FC = () => {
             Back to Dashboard
           </button>
           <div className="text-2xl font-bold text-poker-gold">
-            PokerAI Pro
+            Poker Review
           </div>
           <div></div> {/* Spacer for flex layout */}
         </nav>

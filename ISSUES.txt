@@ -20,3 +20,7 @@ How to handle user getting stacked? No option to rebuy at same seat. Heads up, j
 
 
 Border on images
+
+Updates:
+- Move cards to right
+- Profile pictures

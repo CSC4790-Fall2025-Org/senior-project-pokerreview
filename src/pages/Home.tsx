@@ -27,7 +27,7 @@ export const Home: React.FC = () => {
       <header className="p-6">
         <nav className="flex justify-between items-center max-w-6xl mx-auto">
           <div className="text-2xl font-bold text-poker-gold">
-            PokerAI Pro
+            Poker Review
           </div>
           
           <div className="space-x-4">

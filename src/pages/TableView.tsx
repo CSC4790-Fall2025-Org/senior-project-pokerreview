@@ -615,17 +615,30 @@ useEffect(() => {
                               {player.isBigBlind && <span className="text-red-400 bg-red-900 px-1 rounded">BB</span>}
                             </div>
 
-                            {/* NO static cards shown during preflop if animation hasn't completed */}
-                            {table.gamePhase !== 'preflop' && isCurrentUser && player.cards && player.cards.length > 0 && (
+                            {/* Show cards only after preflop phase OR after animation completes - only if 2+ players */}
+                            {table.players.length >= 2 && table.gamePhase !== 'preflop' && (
                               <div className="flex justify-center space-x-1 mt-2">
-                                {player.cards.map((card, index) => (
-                                  <img
-                                    key={index}
-                                    src={`/cards/${card}.svg`}
-                                    alt={card}
-                                    className="w-12 h-16 rounded shadow-lg"
-                                  />
-                                ))}
+                                {isCurrentUser && player.cards && player.cards.length > 0 ? (
+                                  // Show current user's cards face-up
+                                  player.cards.map((card, index) => (
+                                    <img
+                                      key={index}
+                                      src={`/cards/${card}.svg`}
+                                      alt={card}
+                                      className="w-12 h-16 rounded shadow-lg border border-gray-300"
+                                    />
+                                  ))
+                                ) : (
+                                  // Show opponent's cards face-down
+                                  Array.from({ length: 2 }).map((_, index) => (
+                                    <img
+                                      key={index}
+                                      src="/cards/card_back.png"
+                                      alt="face-down card"
+                                      className="w-12 h-16 rounded shadow-lg border border-gray-300"
+                                    />
+                                  ))
+                                )}
                               </div>
                             )}
                           </div>
