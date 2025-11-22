@@ -133,6 +133,8 @@ export const TableView: React.FC = () => {
   const [holeCardsDealt, setHoleCardsDealt] = useState(false);
   const [animatedCards, setAnimatedCards] = useState<Array<{playerId: string, card: string, index: number}>>([]);
   const [animationComplete, setAnimationComplete] = useState(false);
+  const [playersInCurrentHand, setPlayersInCurrentHand] = useState<Set<string>>(new Set());
+  
 
   const seenEventsRef = useRef(new Set<string>());
 
@@ -155,7 +157,14 @@ export const TableView: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!table || !table.players || table.gamePhase !== 'preflop' || holeCardsDealt) return;
+    // Only deal cards if:
+    // 1. Table exists
+    // 2. Game phase is preflop
+    // 3. Cards haven't been dealt yet
+    // 4. There are at least 2 players (game can actually start)
+    if (!table || !table.players || table.gamePhase !== 'preflop' || holeCardsDealt || table.players.length < 2) {
+      return;
+    }
 
     // Reset animation state when new game starts
     setAnimatedCards([]);
@@ -166,11 +175,23 @@ export const TableView: React.FC = () => {
     // Deal cards in proper order - first card to each player, then second card
     for (let cardIndex = 0; cardIndex < 2; cardIndex++) {
       table.players.forEach((player) => {
-        // Deal cards to ALL players, not just those with visible cards
-        const cardValue = player.cards && player.cards[cardIndex] ? player.cards[cardIndex] : 'card_back';
-        cardsToDeal.push({ playerId: player.id, card: cardValue, index: cardIndex });
+        // ✅ FIXED: Only deal to players who have cards AND are not sitting out
+        if (player.cards && 
+            player.cards.length > 0 && 
+            !(player as any).isSittingOut) {
+          const cardValue = player.cards[cardIndex] || 'card_back';
+          cardsToDeal.push({ playerId: player.id, card: cardValue, index: cardIndex });
+        }
       });
     }
+
+    // Track which players are being dealt cards (they're in the current hand)
+    const currentHandPlayers = new Set(cardsToDeal.map(deal => deal.playerId));
+    setPlayersInCurrentHand(currentHandPlayers);
+    
+    console.log('Players in current hand:', Array.from(currentHandPlayers));
+    console.log('Cards to deal:', cardsToDeal.length);
+    console.log('Players sitting out:', table.players.filter((p: any) => p.isSittingOut).map((p: any) => p.username));
 
     cardsToDeal.forEach((deal, i) => {
       setTimeout(() => {
@@ -181,9 +202,9 @@ export const TableView: React.FC = () => {
           setTimeout(() => {
             setHoleCardsDealt(true);
             setAnimationComplete(true);
-          }, 800); // Wait for animation to complete
+          }, 800);
         }
-      }, i * 150); // Slightly faster dealing
+      }, i * 150);
     });
   }, [table, holeCardsDealt]);
 
@@ -192,7 +213,6 @@ export const TableView: React.FC = () => {
     if (table?.gamePhase !== 'preflop') {
       setHoleCardsDealt(false);
       setAnimatedCards([]);
-      setAnimationComplete(false);
     }
   }, [table?.gamePhase]);
 
@@ -408,6 +428,8 @@ useEffect(() => {
     );
   }
 
+  console.log('Player properties:', table.players[0]); // Log first player to see all properties
+
   const isPlayer = table.userRole === 'player';
   const isSpectator = table.userRole === 'spectator';
   const canJoinAsPlayer = !isPlayer && table.players.length < table.maxPlayers;
@@ -614,40 +636,43 @@ useEffect(() => {
                               {player.isSmallBlind && <span className="text-blue-400 bg-blue-900 px-1 rounded">SB</span>}
                               {player.isBigBlind && <span className="text-red-400 bg-red-900 px-1 rounded">BB</span>}
                             </div>
-
-                            {/* Show cards only after preflop phase OR after animation completes - only if 2+ players */}
-                            {table.players.length >= 2 && table.gamePhase !== 'preflop' && (
+                            {/* Static cards after animation completes - show for ALL phases */}
+                            {animationComplete && (
                               <div className="flex justify-center space-x-1 mt-2">
                                 {isCurrentUser && player.cards && player.cards.length > 0 ? (
                                   // Show current user's cards face-up
                                   player.cards.map((card, index) => (
                                     <img
-                                      key={index}
+                                      key={`static-user-${index}`}
                                       src={`/cards/${card}.svg`}
                                       alt={card}
                                       className="w-12 h-16 rounded shadow-lg border border-gray-300"
                                     />
                                   ))
-                                ) : (
-                                  // Show opponent's cards face-down
+                                ) : !isCurrentUser && 
+                                    player.cards && 
+                                    player.cards.length > 0 && 
+                                    !(player as any).isFolded && 
+                                    !(player as any).isSittingOut ? (
+                                  // ✅ FIXED: Check if they have cards instead of playersInCurrentHand
                                   Array.from({ length: 2 }).map((_, index) => (
                                     <img
-                                      key={index}
+                                      key={`static-opp-${index}`}
                                       src="/cards/card_back.png"
                                       alt="face-down card"
                                       className="w-12 h-16 rounded shadow-lg border border-gray-300"
                                     />
                                   ))
-                                )}
+                                ) : null}
                               </div>
-                            )}
-                          </div>
+                            )}                  
+                            </div>
                         </div>
                       );
                     })}
 
                     {/* Animated hole cards - positioned exactly where static cards would be */}
-                    {animatedCards.map(({ playerId, card, index }, animIndex) => {
+                    {!animationComplete && animatedCards.map(({ playerId, card, index }, animIndex) => {
                       const player = table.players.find(p => p.id === playerId);
                       if (!player) return null;
                       

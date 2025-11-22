@@ -208,11 +208,17 @@ class PokerGame {
       const table = TableService.getTable(this.tableId);
       
       if (table) {
+        // First, clear sitting out flag for ALL players in the table
+        table.players.forEach(p => {
+          p.isSittingOut = false;
+        });
+        
+        // Then sync with game
         table.players.forEach(tablePlayer => {
           // Check if player exists in game
           const existsInGame = this.players.find(p => String(p.id) === String(tablePlayer.id));
           
-          // Add new players who have chips and are active
+          // Add new players who have chips and are active and NOT sitting out
           if (!existsInGame && tablePlayer.chips > 0 && tablePlayer.isActive) {
             console.log(`➕ Adding new player ${tablePlayer.username} (position ${tablePlayer.position}) to game`);
             this.players.push({

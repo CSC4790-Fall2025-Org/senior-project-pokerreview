@@ -206,7 +206,8 @@ class TableController {
           currentBet: player.currentBet,
           isFolded: player.isFolded,
           isAllIn: player.isAllIn,
-          cards: player.id === userId ? (player.cards || []) : []
+          isSittingOut: player.isSittingOut || false,
+          cards: player.id === userId ? (player.cards || []) : (player.cards && player.cards.length > 0 ? ['hidden', 'hidden'] : [])
         })),
         spectators: table.spectators.map(spec => ({
           id: spec.id,

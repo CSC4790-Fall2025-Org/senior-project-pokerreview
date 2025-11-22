@@ -211,7 +211,8 @@ class TableService {
               action: gamePlayer.action,
               cards: gamePlayer.cards,
               isActive: player.isActive,
-              lastSeen: player.lastSeen
+              lastSeen: player.lastSeen,
+              isSittingOut: player.isSittingOut || false
             };
           }
           return player;
@@ -244,7 +245,6 @@ class TableService {
     return true;
   }
 
-  // Join as player
   static joinAsPlayer(tableId, user, buyInAmount) {
     const table = this.activeTables.get(tableId);
     if (!table) {
@@ -285,6 +285,11 @@ class TableService {
       return { success: false, error: 'No available positions' };
     }
     
+    // ✅ CHECK: Determine if player should sit out this hand
+    const gameInProgress = table.status === 'active' && 
+                          table.gamePhase !== 'waiting' && 
+                          table.gamePhase !== 'finished';
+    
     // Add player with the assigned position
     const player = {
       id: user.id,
@@ -295,7 +300,8 @@ class TableService {
       isActive: true,
       hasActed: false,
       lastSeen: new Date(),
-      cards: []
+      cards: [],
+      isSittingOut: gameInProgress  // ✅ NEW: Sit out if hand in progress
     };
     
     table.players.push(player);
@@ -310,11 +316,13 @@ class TableService {
     }
     
     table.lastActivity = new Date();
-    console.log(`User ${user.username} joined table ${table.name} as player at position ${position} with ${buyInAmount}`);
     
-    return { success: true, position };
-  }
-  // Start a poker game
+    // ✅ ENHANCED: Better logging
+    const sittingOutMsg = gameInProgress ? ' (sitting out until next hand)' : '';
+    console.log(`User ${user.username} joined table ${table.name} as player at position ${position} with ${buyInAmount}${sittingOutMsg}`);
+    
+    return { success: true, position, isSittingOut: gameInProgress };
+  }  // Start a poker game
   static startGame(tableId) {
     const table = this.activeTables.get(tableId);
     if (!table) return false;
