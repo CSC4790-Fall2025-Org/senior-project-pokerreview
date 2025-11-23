@@ -206,36 +206,82 @@ export const HandHistory: React.FC<HandHistoryProps> = ({ isOpen, onClose }) => 
                 )}
 
                 {/* Showdown Results - NEW SECTION */}
-                {selectedHand.actions?.some((a: any) => a.handDisplay) && (
+                {/* Hand Actions */}
+                {selectedHand.actions && selectedHand.actions.length > 0 && (
                   <div className="bg-gray-900 rounded-lg p-4">
-                    <h3 className="text-lg font-bold text-white mb-3">Showdown</h3>
-                    <div className="space-y-3">
-                      {selectedHand.actions
-                        ?.filter((action: any) => action.action?.includes('wins') && action.winningHand)
-                        .map((winAction: any, index: number) => (
-                          <div key={index} className="bg-green-900 bg-opacity-30 p-3 rounded-lg border-2 border-green-500">
-                            <div className="flex justify-between items-start mb-2">
-                              <div>
-                                <span className="text-green-300 font-bold text-lg">{winAction.player}</span>
-                                <span className="text-gray-300 ml-2">wins {formatCurrency(winAction.pot)}</span>
+                    <h3 className="text-lg font-bold text-white mb-3">Hand Actions</h3>
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {selectedHand.actions.map((action: any, index: number) => {
+                        const isGameAction = action.player === 'game' || !action.player;
+                        const isWinAction = action.action?.includes('wins');
+                        
+                        return (
+                          <div
+                            key={index}
+                            className={`p-2 rounded ${
+                              isWinAction
+                                ? 'bg-green-900 bg-opacity-30 border-l-4 border-green-500'
+                                : isGameAction
+                                ? 'bg-gray-800 border-l-4 border-blue-500'
+                                : 'bg-gray-800 border-l-4 border-gray-600'
+                            }`}
+                          >
+                            <div className="flex justify-between items-center">
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-0.5 rounded text-xs ${
+                                  action.phase === 'preflop' ? 'bg-blue-600' :
+                                  action.phase === 'flop' ? 'bg-green-600' :
+                                  action.phase === 'turn' ? 'bg-yellow-600' :
+                                  action.phase === 'river' ? 'bg-red-600' :
+                                  action.phase === 'showdown' ? 'bg-purple-600' :
+                                  'bg-gray-600'
+                                }`}>
+                                  {action.phase}
+                                </span>
+                                <span className={`font-semibold ${
+                                  isGameAction ? 'text-blue-300' : 
+                                  isWinAction ? 'text-green-300' : 
+                                  'text-white'
+                                }`}>
+                                  {action.player || 'Game'}
+                                </span>
+                                <span className="text-gray-300">{action.action}</span>
                               </div>
-                              <div className="text-right">
-                                <div className="text-yellow-400 font-semibold">{winAction.handDescription}</div>
-                                <div className="text-green-300 text-xl font-mono">{winAction.handDisplay}</div>
+                              {action.pot > 0 && (
+                                <span className="text-yellow-400 text-sm">
+                                  Pot: {formatCurrency(action.pot)}
+                                </span>
+                              )}
+                            </div>
+                            
+                            {/* Show winning hand if available */}
+                            {isWinAction && action.winningHand && (
+                              <div className="mt-2 flex gap-1">
+                                {action.winningHand.map((card: string, i: number) => (
+                                  <img
+                                    key={i}
+                                    src={`/cards/${card}.svg`}
+                                    alt={card}
+                                    className="w-10 h-14 rounded shadow-lg"
+                                  />
+                                ))}
+                                {action.handDescription && (
+                                  <div className="ml-2 flex items-center">
+                                    <span className="text-yellow-400 font-semibold">
+                                      {action.handDescription}
+                                    </span>
+                                    {action.handDisplay && (
+                                      <span className="text-green-300 text-lg font-mono ml-2">
+                                        ({action.handDisplay})
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
-                            </div>
-                            <div className="flex gap-1 justify-center">
-                              {winAction.winningHand.map((card: string, i: number) => (
-                                <img
-                                  key={i}
-                                  src={`/cards/${card}.svg`}
-                                  alt={card}
-                                  className="w-12 h-16 rounded shadow-lg"
-                                />
-                              ))}
-                            </div>
+                            )}
                           </div>
-                        ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
