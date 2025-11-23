@@ -6,6 +6,7 @@ const path = require('path');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const tableRoutes = require('./routes/tables');
+const aiRoutes = require('./routes/ai');
 require('dotenv').config();
 
 const app = express();
@@ -38,6 +39,8 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use((req,res,next)=>{ console.log('[REQ]', req.method, req.url); next(); });
 
+app.use('/api/ai', aiRoutes);
+
 
 // DEBUG: Log all requests in development
 if (process.env.NODE_ENV !== 'production') {
@@ -55,6 +58,8 @@ app.use('/api/users', userRoutes);
 console.log('User routes registered');
 app.use('/api/tables', tableRoutes);
 console.log('Table routes registered');
+app.use('/api/ai', aiRoutes); 
+console.log('AI routes registered');
 
 // Health check endpoint
 app.get('/health', (req, res) => {
