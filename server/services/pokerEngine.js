@@ -313,16 +313,17 @@ class PokerGame {
     // Calculate hand duration
     this.currentHandLog.duration = Date.now() - this.currentHandLog.timestamp.getTime();
     
-    // Record ending stacks
+    // Record ending stacks WITH CARDS ✅
     this.currentHandLog.endingStacks = this.players.map(p => ({
       id: p.id,
       username: p.username,
       chips: p.chips,
-      profit: p.chips - this.currentHandLog.startingStacks.find(s => s.id === p.id)?.chips
+      profit: p.chips - this.currentHandLog.startingStacks.find(s => s.id === p.id)?.chips,
+      cards: p.cards.map(c => c.toString())  // ✅ ADD THIS LINE
     }));
     
     const completedLog = { ...this.currentHandLog };
-    this.finalizedHandLog = completedLog; // Store it before clearing
+    this.finalizedHandLog = completedLog;
     this.currentHandLog = null;
     
     return completedLog;

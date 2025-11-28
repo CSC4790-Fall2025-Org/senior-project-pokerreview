@@ -50,8 +50,8 @@ class HandHistory {
           `INSERT INTO hand_players (
             hand_id, user_id, username, position,
             starting_chips, ending_chips, profit,
-            is_winner, folded_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            is_winner, folded_at, cards
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
           [
             dbHandId,
             parseInt(player.id),
@@ -61,7 +61,8 @@ class HandHistory {
             player.chips,
             player.profit,
             isWinner,
-            foldedAt
+            foldedAt,
+            JSON.stringify(player.cards || [])  // ✅ ADD THIS PARAMETER
           ]
         );
       }
@@ -128,18 +129,29 @@ class HandHistory {
         ph.board_flop,
         ph.board_turn,
         ph.board_river,
+        ph.small_blind,
+        ph.big_blind,
         hp.position,
         hp.starting_chips,
         hp.ending_chips,
         hp.profit,
         hp.is_winner,
         hp.folded_at,
+        hp.cards as hole_cards,  -- ✅ ADD THIS LINE
+        hp.final_hand_rank,       -- ✅ ADD THIS LINE
         (SELECT jsonb_agg(
           jsonb_build_object(
             'username', hp2.username,
+            'user_id', hp2.user_id,
+            'position', hp2.position,
+            'starting_chips', hp2.starting_chips,
+            'ending_chips', hp2.ending_chips,
             'profit', hp2.profit,
-            'is_winner', hp2.is_winner
-          )
+            'is_winner', hp2.is_winner,
+            'folded_at', hp2.folded_at,
+            'cards', hp2.cards,  -- ✅ ADD THIS LINE
+            'final_hand_rank', hp2.final_hand_rank  -- ✅ ADD THIS LINE
+          ) ORDER BY hp2.position
         ) FROM hand_players hp2 WHERE hp2.hand_id = ph.id) as all_players,
         (SELECT jsonb_agg(
           jsonb_build_object(

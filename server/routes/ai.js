@@ -1,12 +1,42 @@
-// server/routes/ai.js
 const express = require('express');
 const router = express.Router();
+const { 
+  POKER_ANALYSIS_SYSTEM_PROMPT, 
+  POKER_FOLLOWUP_PROMPT,
+  formatHandForAnalysis 
+} = require('../prompts/pokerAnalysisPrompt');
 
 router.post('/analyze-hand', async (req, res) => {
   try {
-    const { messages, maxTokens = 1000 } = req.body;
+    const { messages, maxTokens = 1000, hand } = req.body;
 
     console.log('Calling OpenAI API...');
+    
+    // Determine if this is initial analysis or follow-up
+    let processedMessages;
+    
+    if (hand && (!messages || messages.length === 0)) {
+      // Initial analysis - format hand data
+      processedMessages = [
+        {
+          role: 'system',
+          content: POKER_ANALYSIS_SYSTEM_PROMPT
+        },
+        {
+          role: 'user',
+          content: `Please analyze this poker hand in detail:\n\n${formatHandForAnalysis(hand)}`
+        }
+      ];
+    } else if (messages && messages.length > 0) {
+      // Follow-up conversation - use provided messages
+      processedMessages = messages;
+    } else {
+      // Fallback - shouldn't happen but handle it
+      return res.status(400).json({
+        success: false,
+        error: 'Either hand data or messages must be provided'
+      });
+    }
     
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -16,7 +46,7 @@ router.post('/analyze-hand', async (req, res) => {
       },
       body: JSON.stringify({
         model: 'gpt-4',
-        messages: messages,
+        messages: processedMessages,
         temperature: 0.7,
         max_tokens: maxTokens
       })
