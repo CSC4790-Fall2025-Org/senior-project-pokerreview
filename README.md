@@ -194,8 +194,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 👥 Authors
 
-- **Fatih** - Frontend, Game Logic, AI Integration
-- **George** - Backend, Authentication, Game Mechanics
+- **Fatih** - Frontend, Backend, AI Integration
+- **George** - Game Logic, Authentication, Game Mechanics
 - **Mark** - Deployment, Infrastructure, Database
 
 ## 🙏 Acknowledgments

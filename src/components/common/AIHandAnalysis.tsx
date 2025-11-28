@@ -12,17 +12,28 @@ export const AIHandAnalysis: React.FC<AIHandAnalysisProps> = ({ hand, isOpen, on
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [hasInitialAnalysis, setHasInitialAnalysis] = useState(false);
+  const [currentHandId, setCurrentHandId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const handId = hand?.id || hand?.hand_id;
+    
+    // If hand changed, reset everything
+    if (handId && handId !== currentHandId) {
+      setCurrentHandId(handId);
+      setMessages([]);
+      setHasInitialAnalysis(false);
+      setInput('');
+    }
+  }, [hand]);
 
   React.useEffect(() => {
     if (isOpen && hand && !hasInitialAnalysis) {
       getInitialAnalysis();
     }
-  }, [isOpen, hand]);
+  }, [isOpen, hand, hasInitialAnalysis]);
 
   const getInitialAnalysis = async () => {
     setIsLoading(true);
-    
-    const handSummary = formatHandForGPT(hand);
     
     try {
       const response = await fetch('/api/ai/analyze-hand', {
@@ -31,25 +42,9 @@ export const AIHandAnalysis: React.FC<AIHandAnalysisProps> = ({ hand, isOpen, on
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          messages: [
-            {
-              role: 'system',
-              content: `You are an expert poker coach and strategist with years of experience analyzing hand histories. Provide detailed, actionable analysis focusing on:
-1. Preflop strategy and position play
-2. Post-flop decision making on each street
-3. Bet sizing and its strategic implications
-4. Range considerations for each player
-5. Missed opportunities or alternative lines
-6. Specific recommendations for improvement
-
-Be specific about which decisions were good or bad and explain WHY. Reference specific actions and pot sizes.`
-            },
-            {
-              role: 'user',
-              content: `Please analyze this poker hand in detail:\n\n${handSummary}`
-            }
-          ],
+          hand: hand, // Send the full hand object
           maxTokens: 1000
+          // Don't send messages array on initial analysis
         })
       });
 
@@ -72,74 +67,6 @@ Be specific about which decisions were good or bad and explain WHY. Reference sp
     }
   };
 
-  const formatHandForGPT = (hand: any) => {
-    const allPlayers = hand.all_players || [];
-    const currentPlayer = allPlayers.find((p: any) => p.user_id);
-    
-    let summary = `**Hand Details**\n`;
-    summary += `Table: ${hand.table_id}\n`;
-    summary += `Stakes: ${hand.small_blind || 5}/${hand.big_blind || 10} (Small Blind/Big Blind)\n`;
-    summary += `Final Pot: ${hand.pot_size}\n`;
-    summary += `Duration: Started ${new Date(hand.started_at).toLocaleTimeString()}\n\n`;
-
-    summary += `**Players & Starting Stacks:**\n`;
-    allPlayers.forEach((player: any, idx: number) => {
-      const position = idx === 0 ? ' (Button)' : idx === 1 ? ' (Small Blind)' : idx === 2 ? ' (Big Blind)' : '';
-      summary += `${idx + 1}. ${player.username}${position}: Stack ${player.starting_chips || 'N/A'}`;
-      if (player.hole_cards) {
-        const cards = typeof player.hole_cards === 'string' ? JSON.parse(player.hole_cards) : player.hole_cards;
-        summary += ` [Hole Cards: ${cards.join(', ')}]`;
-      }
-      summary += `\n`;
-    });
-
-    // Add board cards if they exist
-    if (hand.board_flop || hand.board_turn || hand.board_river) {
-      summary += `\n**Community Cards:**\n`;
-      if (hand.board_flop) {
-        const flop = typeof hand.board_flop === 'string' ? JSON.parse(hand.board_flop) : hand.board_flop;
-        summary += `Flop: ${flop.join(', ')}\n`;
-      }
-      if (hand.board_turn) summary += `Turn: ${hand.board_turn}\n`;
-      if (hand.board_river) summary += `River: ${hand.board_river}\n`;
-    }
-
-    // Add detailed action sequence
-    if (hand.actions && hand.actions.length > 0) {
-      summary += `\n**Action Sequence:**\n`;
-      let currentPhase = '';
-      let actionNum = 1;
-      
-      hand.actions.forEach((action: any) => {
-        if (action.phase !== currentPhase) {
-          currentPhase = action.phase;
-          summary += `\n--- ${currentPhase.toUpperCase()} ---\n`;
-          actionNum = 1;
-        }
-        const player = action.player || 'Dealer';
-        summary += `${actionNum}. ${player}: ${action.action}`;
-        if (action.pot) summary += ` (Pot: ${action.pot})`;
-        summary += `\n`;
-        actionNum++;
-      });
-    }
-
-    // Add final results
-    summary += `\n**Final Results:**\n`;
-    allPlayers.forEach((player: any) => {
-      const profit = player.profit || 0;
-      const profitStr = profit > 0 ? `+${profit}` : profit < 0 ? `-${Math.abs(profit)}` : '$0';
-      const winnerTag = player.is_winner ? ' 🏆 WINNER' : '';
-      summary += `- ${player.username}: ${profitStr}${winnerTag}`;
-      if (player.final_hand) {
-        summary += ` (${player.final_hand})`;
-      }
-      summary += `\n`;
-    });
-
-    return summary;
-  };
-
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
 
@@ -149,15 +76,11 @@ Be specific about which decisions were good or bad and explain WHY. Reference sp
     setIsLoading(true);
 
     try {
-      // Build conversation history for Claude
+      // Build conversation history
       const conversationMessages = [
         {
           role: 'system',
           content: `You are an expert poker coach continuing a conversation about this hand. Answer follow-up questions with specific, actionable advice.`
-        },
-        {
-          role: 'user',
-          content: `Here's the hand we're discussing:\n\n${formatHandForGPT(hand)}`
         },
         {
           role: 'assistant',
@@ -165,7 +88,7 @@ Be specific about which decisions were good or bad and explain WHY. Reference sp
         }
       ];
 
-      // Add subsequent messages
+      // Add all messages after the initial analysis
       for (let i = 1; i < messages.length; i++) {
         conversationMessages.push({
           role: messages[i].role,
@@ -186,6 +109,7 @@ Be specific about which decisions were good or bad and explain WHY. Reference sp
         },
         body: JSON.stringify({
           messages: conversationMessages,
+          hand: hand, // Include hand for context
           maxTokens: 500
         })
       });
@@ -211,7 +135,7 @@ Be specific about which decisions were good or bad and explain WHY. Reference sp
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-y-0 right-0 w-96 bg-gray-900 shadow-2xl z-[60] flex flex-col border-l border-gray-700">
+    <div className="fixed inset-y-0 right-0 w-[550px] bg-gray-900 shadow-2xl z-[60] flex flex-col border-l border-gray-700">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-700">
         <h3 className="text-lg font-bold text-white">AI Hand Analysis</h3>
