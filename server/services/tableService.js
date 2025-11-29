@@ -373,53 +373,49 @@ class TableService {
           }
         });
         
-        // Check if game ended and start new hand
-        // Check if game ended and start new hand
-        if (gameState.gamePhase === 'finished') {
-          // FIRST: Store the hand log IMMEDIATELY
-          const completedHandLog = game.currentHandLog;
+        // ✅ Check if hand just finished and save it
+        if (gameState.gamePhase === 'finished' && game.completedHandLogToSave) {
+          const completedHandLog = game.completedHandLogToSave;
           
-          console.log('=== HAND FINISHED DEBUG ===');
-          console.log('completedHandLog exists?', !!completedHandLog);
-          if (completedHandLog) {
-            console.log('Hand ID:', completedHandLog.handId);
-            console.log('Players:', completedHandLog.endingStacks.map(p => ({ id: p.id, username: p.username, profit: p.profit })));
+          console.log('=== HAND FINISHED - SAVING TO DB ===');
+          console.log('Hand ID:', completedHandLog.handId);
+          console.log('Ending stacks:', completedHandLog.endingStacks.map(p => ({
+            username: p.username,
+            chips: p.chips,
+            profit: p.profit,
+            cards: p.cards
+          })));
+          console.log('====================================');
+          
+          // Store in memory
+          if (!this.completedHands.has(tableId)) {
+            this.completedHands.set(tableId, []);
           }
-          console.log('==========================');
+          this.completedHands.get(tableId).push(completedHandLog);
           
-          if (completedHandLog) {
-            // Store in memory
-            if (!this.completedHands.has(tableId)) {
-              this.completedHands.set(tableId, []);
-            }
-            this.completedHands.get(tableId).push(completedHandLog);
-            console.log(`✅ Stored hand log in memory for table ${tableId}`);
-            console.log(`📊 Total hands in memory: ${this.completedHands.get(tableId).length}`);
-            
-            // Store in database (async, don't wait)
-            console.log('🔄 Attempting to save hand to database...');
-            HandHistory.saveHand(completedHandLog)
-              .then(dbHandId => {
-                console.log(`💾 SUCCESS! Hand saved to database with ID: ${dbHandId}`);
-              })
-              .catch(err => {
-                console.error('❌ FAILED to save hand to database:');
-                console.error('Error message:', err.message);
-                console.error('Error stack:', err.stack);
-              });
-            
-            // Clear from game
-            game.currentHandLog = null;
+          // Keep only last 50 hands per table in memory
+          if (this.completedHands.get(tableId).length > 50) {
+            this.completedHands.get(tableId).shift(); // Remove oldest
           }
           
-          setTimeout(() => {
-            if (table.players.filter(p => p.chips > 0).length >= 2) {
-              game.startNewHand();
-            } else {
-              table.status = 'waiting';
-              this.activeGames.delete(tableId);
-            }
-          }, 5000);
+          console.log(`✅ Stored hand log in memory for table ${tableId}`);
+          console.log(`📊 Total hands in memory: ${this.completedHands.get(tableId).length}`);
+          
+          // ✅ Clear the completed log from game engine
+          game.completedHandLogToSave = null;
+          
+          // Save to database asynchronously
+          console.log('🔄 Attempting to save hand to database...');
+          HandHistory.saveHand(completedHandLog)
+            .then(dbHandId => {
+              console.log(`💾 SUCCESS! Hand saved to database with ID: ${dbHandId}`);
+            })
+            .catch(err => {
+              console.error('❌ FAILED to save hand to database:');
+              console.error('Error message:', err.message);
+              console.error('Error stack:', err.stack);
+              console.error('Hand data:', JSON.stringify(completedHandLog, null, 2));
+            });
         }
       }
       

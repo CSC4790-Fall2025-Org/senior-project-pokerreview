@@ -313,17 +313,38 @@ class PokerGame {
     // Calculate hand duration
     this.currentHandLog.duration = Date.now() - this.currentHandLog.timestamp.getTime();
     
-    // Record ending stacks WITH CARDS ✅
-    this.currentHandLog.endingStacks = this.players.map(p => ({
-      id: p.id,
-      username: p.username,
-      chips: p.chips,
-      profit: p.chips - this.currentHandLog.startingStacks.find(s => s.id === p.id)?.chips,
-      cards: p.cards.map(c => c.toString())  // ✅ ADD THIS LINE
-    }));
+    // ✅ Record ending stacks WITH CARDS from showdown data
+    this.currentHandLog.endingStacks = this.players.map(p => {
+      // Get cards from showdown if available, otherwise from player
+      let playerCards = [];
+      if (this.currentHandLog.showdown && this.currentHandLog.showdown.playersShown) {
+        const showdownPlayer = this.currentHandLog.showdown.playersShown.find(sp => sp.id === p.id);
+        if (showdownPlayer && showdownPlayer.cards) {
+          playerCards = showdownPlayer.cards;
+        }
+      }
+      
+      // Fallback to player's cards if showdown data not available
+      if (playerCards.length === 0 && p.cards && p.cards.length > 0) {
+        playerCards = p.cards.map(c => typeof c === 'string' ? c : c.toString());
+      }
+      
+      const startingStack = this.currentHandLog.startingStacks.find(s => s.id === p.id);
+      const startingChips = startingStack ? startingStack.chips : p.chips;
+      
+      return {
+        id: p.id,
+        username: p.username,
+        chips: p.chips,
+        profit: p.chips - startingChips,
+        cards: playerCards,
+        finalHandRank: p.finalHandRank || null
+      };
+    });
+    
+    console.log('📊 Finalized ending stacks:', this.currentHandLog.endingStacks);
     
     const completedLog = { ...this.currentHandLog };
-    this.finalizedHandLog = completedLog;
     this.currentHandLog = null;
     
     return completedLog;
@@ -493,7 +514,8 @@ class PokerGame {
       throw new Error('Cannot check - must call or fold');
     }
     
-    return { action: 'check' };
+    // Don't modify hasActed here - it's handled in playerAction
+    return { action: 'check', amount: 0 };
   }
 
   playerBetAction(player, amount) {
@@ -685,30 +707,54 @@ class PokerGame {
   
 
   endHandEarly(winner) {
-  // Finalize the hand log BEFORE doing anything else
-  if (this.currentHandLog) {
-    this.currentHandLog.duration = Date.now() - this.currentHandLog.timestamp.getTime();
-    this.currentHandLog.endingStacks = this.players.map(p => ({
-      id: p.id,
-      username: p.username,
-      chips: p.chips + (p.id === winner.id ? this.pot : 0), // Add pot to winner's chips
-      profit: (p.chips + (p.id === winner.id ? this.pot : 0)) - 
-              this.currentHandLog.startingStacks.find(s => s.id === p.id)?.chips
-    }));
-  }
-  
-  winner.chips += this.pot;
-  this.logAction(
-    winner.username, 
-    `wins $${this.pot} (all others folded)`,
-    {
-      pot: this.pot
+    console.log(`Hand ended early. Winner: ${winner.username}`);
+    
+    winner.chips += this.pot;
+    this.logAction(
+      winner.username, 
+      `wins $${this.pot} (all others folded)`,
+      {
+        pot: this.pot
+      }
+    );
+    
+    // ✅ Record minimal showdown data
+    if (this.currentHandLog) {
+      this.currentHandLog.showdown = {
+        playersShown: [{
+          id: winner.id,
+          username: winner.username,
+          cards: winner.cards.map(c => c.toString()),
+          handRank: 'Won by fold',
+          handCards: []
+        }],
+        winners: [{
+          id: winner.id,
+          username: winner.username,
+          amountWon: this.pot,
+          handRank: 'Won by fold'
+        }]
+      };
     }
-  );
-  this.gamePhase = 'finished';
-  
-  console.log(`Hand finished. Winner: ${winner.username}`);
-}
+    
+    // ✅ FINALIZE here too
+    const completedHandLog = this.finalizeHandLog();
+    this.completedHandLogToSave = completedHandLog;
+    
+    this.gamePhase = 'finished';
+    
+    // ✅ Auto-start after delay
+    setTimeout(() => {
+      console.log('⏰ Auto-starting next hand after early finish...');
+      const playersWithChips = this.players.filter(p => p.chips > 0 && p.isActive);
+      if (playersWithChips.length >= 2) {
+        this.startNewHand();
+      } else {
+        console.log('⚠️ Not enough players to continue.');
+        this.gamePhase = 'waiting';
+      }
+    }, 5000);
+  }
 
   dealRemainingCards() {
     while (this.communityCards.length < 5) {
@@ -858,7 +904,7 @@ class PokerGame {
     this.currentBet = 0;
     this.lastRaiseAmount = 0;
     this.bettingRound++;
-  
+
     switch (this.gamePhase) {
       case 'preflop':
         this.gamePhase = 'flop';
@@ -883,15 +929,17 @@ class PokerGame {
         this.startNewHand();
         return;
     }
-  
-    // In heads-up, Big Blind (non-dealer) acts first post-flop
-    // In multi-way (3+), small blind position acts first
+
+    // ✅ FIXED: Correct heads-up position logic for postflop
     if (this.players.length === 2) {
-      // Heads-up: Big Blind acts first post-flop (the player who is NOT the dealer)
-      const bigBlindPosition = (this.dealerPosition + 1) % this.players.length;
-      this.currentPlayerIndex = bigBlindPosition;
+      // In heads-up postflop, the DEALER (small blind) acts first
+      // This is OPPOSITE from preflop where big blind can close action
+      this.currentPlayerIndex = this.dealerPosition;
+      
+      const dealer = this.players[this.dealerPosition];
+      console.log(`Heads-up postflop: dealer/SB (${dealer.username}) at position ${this.dealerPosition} acts first`);
     } else {
-      // Multi-way: First active player after dealer acts first
+      // Multi-way: First active player after dealer acts first (small blind position)
       this.currentPlayerIndex = this.getNextActivePlayer((this.dealerPosition + 1) % this.players.length);
     }
     
@@ -899,7 +947,8 @@ class PokerGame {
       this.currentPlayerIndex = this.getNextActivePlayer(0);
     }
     
-    console.log(`Next phase: ${this.gamePhase}, Current player: ${this.currentPlayerIndex >= 0 ? this.players[this.currentPlayerIndex].username : 'none'}`);
+    const currentPlayer = this.players[this.currentPlayerIndex];
+    console.log(`Next phase: ${this.gamePhase}, Current player: ${currentPlayer ? currentPlayer.username : 'none'}`);
   }
 
 
@@ -937,165 +986,244 @@ class PokerGame {
   }
 
   showdown() {
-  const activePlayers = this.getActivePlayers();
-  
-  console.log('🎰 === SHOWDOWN STARTING ===');
-  console.log('Active players:', activePlayers.map(p => ({ 
-    username: p.username, 
-    chips: p.chips,
-    cards: p.cards.map(c => c.toString())
-  })));
-  console.log('Pot:', this.pot);
-  console.log('Community cards:', this.communityCards.map(c => c.toString()));
-  
-  // Log showdown at the START
-  this.logAction('game', 'Showdown');
-  
-  if (activePlayers.length === 1) {
-    // Only one player left - they win by default
-    activePlayers[0].chips += this.pot;
-    console.log(`✅ ${activePlayers[0].username} wins ${this.pot} (no showdown)`);
+    const activePlayers = this.getActivePlayers();
     
-    this.logAction(
-      activePlayers[0].username, 
-      `wins $${this.pot} (no showdown)`,
-      {
-        pot: this.pot,
-        handDescription: 'No showdown',
-        handDisplay: 'Won uncontested'
-      }
-    );
-  } else {
-    // Multiple players - evaluate hands
-    console.log('🃏 Evaluating showdown with', activePlayers.length, 'players');
-    this.evaluateShowdown(activePlayers);
-  }
-  
-  // Finalize hand log BEFORE setting phase to finished
-  if (this.currentHandLog) {
-    this.currentHandLog.duration = Date.now() - this.currentHandLog.timestamp.getTime();
-    this.currentHandLog.endingStacks = this.players.map(p => ({
-      id: p.id,
-      username: p.username,
+    console.log('🎰 === SHOWDOWN STARTING ===');
+    console.log('Active players:', activePlayers.map(p => ({ 
+      username: p.username, 
       chips: p.chips,
-      profit: p.chips - this.currentHandLog.startingStacks.find(s => s.id === p.id)?.chips
-    }));
-  }
-  
-  console.log('💰 Final chip counts:', this.players.map(p => ({ username: p.username, chips: p.chips })));
-  console.log('🎰 === SHOWDOWN COMPLETE ===');
-  
-  this.gamePhase = 'finished';
-  this.currentPlayerIndex = -1;
-  
-  // ✅ Auto-start next hand after 8 seconds (give users time to see results)
-  setTimeout(() => {
-    console.log('⏰ Auto-starting next hand after showdown delay...');
-    const playersWithChips = this.players.filter(p => p.chips > 0 && p.isActive);
-    if (playersWithChips.length >= 2) {
-      this.startNewHand();
-    } else {
-      console.log('⚠️ Not enough players to continue. Game ending.');
-      this.gamePhase = 'waiting';
-    }
-  }, 8000); // 8 second delay
-}
-
-evaluateShowdown(players) {
-  console.log('🃏 === EVALUATING HANDS ===');
-  
-  const playerHands = players.map(player => {
-    const allCards = [...player.cards, ...this.communityCards];
-    const hand = HandEvaluator.evaluateHand(allCards);
+      cards: p.cards.map(c => c.toString())
+    })));
+    console.log('Pot:', this.pot);
+    console.log('Community cards:', this.communityCards.map(c => c.toString()));
     
-    console.log(`📋 ${player.username}:`, {
-      holeCards: player.cards.map(c => c.toString()),
-      handRank: hand.name,
-      handValue: hand.rank,
-      handCards: hand.cards
+    // Log showdown at the START
+    this.logAction('game', 'Showdown');
+    
+    if (activePlayers.length === 1) {
+      // Only one player left - they win by default
+      const winner = activePlayers[0];
+      winner.chips += this.pot;
+      console.log(`✅ ${winner.username} wins ${this.pot} (no showdown)`);
+      
+      this.logAction(
+        winner.username, 
+        `wins $${this.pot} (no showdown)`,
+        {
+          pot: this.pot,
+          handDescription: 'No showdown',
+          handDisplay: 'Won uncontested'
+        }
+      );
+      
+      // ✅ Record showdown data even for single winner
+      if (this.currentHandLog) {
+        this.currentHandLog.showdown = {
+          playersShown: [{
+            id: winner.id,
+            username: winner.username,
+            cards: winner.cards.map(c => c.toString()),
+            handRank: 'Won uncontested',
+            handCards: []
+          }],
+          winners: [{
+            id: winner.id,
+            username: winner.username,
+            amountWon: this.pot,
+            handRank: 'Won uncontested'
+          }]
+        };
+      }
+    } else {
+      // Multiple players - evaluate hands
+      console.log('🃏 Evaluating showdown with', activePlayers.length, 'players');
+      this.evaluateShowdown(activePlayers);
+    }
+    
+    // ✅ FINALIZE HAND LOG HERE - AFTER showdown is complete
+    const completedHandLog = this.finalizeHandLog();
+    
+    console.log('💰 Final chip counts:', this.players.map(p => ({ username: p.username, chips: p.chips })));
+    console.log('🎰 === SHOWDOWN COMPLETE ===');
+    
+    this.gamePhase = 'finished';
+    this.currentPlayerIndex = -1;
+    
+    // ✅ Return the completed hand log so TableService can save it
+    this.completedHandLogToSave = completedHandLog;
+    
+    // ✅ Auto-start next hand after 8 seconds
+    setTimeout(() => {
+      console.log('⏰ Auto-starting next hand after showdown delay...');
+      const playersWithChips = this.players.filter(p => p.chips > 0 && p.isActive);
+      if (playersWithChips.length >= 2) {
+        this.startNewHand();
+      } else {
+        console.log('⚠️ Not enough players to continue. Game ending.');
+        this.gamePhase = 'waiting';
+      }
+    }, 8000);
+  }
+
+  evaluateShowdown(players) {
+    console.log('🃏 === EVALUATING HANDS ===');
+    
+    const playerHands = players.map(player => {
+      // ✅ Convert string cards back to Card objects if needed
+      const playerCards = player.cards.map(card => {
+        if (typeof card === 'string') {
+          // Parse string like "9d" into Card object
+          const suit = card.slice(-1);  // Last character is suit
+          const rank = card.slice(0, -1); // Everything before last char is rank
+          return new Card(suit, rank);
+        }
+        return card; // Already a Card object
+      });
+      
+      const communityCards = this.communityCards.map(card => {
+        if (typeof card === 'string') {
+          const suit = card.slice(-1);
+          const rank = card.slice(0, -1);
+          return new Card(suit, rank);
+        }
+        return card;
+      });
+      
+      const allCards = [...playerCards, ...communityCards];
+      
+      console.log(`🔍 Evaluating ${player.username}:`, {
+        holeCards: playerCards.map(c => c.toString()),
+        communityCards: communityCards.map(c => c.toString()),
+        totalCards: allCards.length,
+        cardTypes: allCards.map(c => typeof c)
+      });
+      
+      // ✅ Add validation
+      if (allCards.length < 5) {
+        console.error(`❌ Not enough cards for ${player.username}: ${allCards.length} cards`);
+        return null;
+      }
+      
+      // ✅ Wrap in try-catch to see the actual error
+      let hand;
+      try {
+        hand = HandEvaluator.evaluateHand(allCards);
+      } catch (error) {
+        console.error(`❌ Error evaluating hand for ${player.username}:`, error);
+        console.error('Cards that caused error:', allCards.map(c => ({
+          toString: c.toString(),
+          suit: c.suit,
+          rank: c.rank,
+          getValue: c.getValue ? c.getValue() : 'NO METHOD'
+        })));
+        return null;
+      }
+      
+      // ✅ Check if hand evaluation failed
+      if (!hand) {
+        console.error(`❌ Hand evaluation returned null for ${player.username}`);
+        return null;
+      }
+      
+      console.log(`📋 ${player.username}:`, {
+        holeCards: playerCards.map(c => c.toString()),
+        handRank: hand.name,
+        handValue: hand.rank,
+        handCards: hand.cards
+      });
+      
+      return {
+        player,
+        hand,
+        allCards
+      };
+    });
+
+    // ✅ Filter out any null results
+    const validPlayerHands = playerHands.filter(ph => ph !== null);
+    
+    if (validPlayerHands.length === 0) {
+      console.error('❌ No valid hands to evaluate!');
+      return;
+    }
+
+    validPlayerHands.sort((a, b) => {
+      if (!a.hand || !b.hand) return 0;
+      
+      if (a.hand.rank !== b.hand.rank) {
+        return b.hand.rank - a.hand.rank;
+      }
+      
+      // Same hand rank - compare kickers
+      for (let i = 0; i < a.hand.cards.length; i++) {
+        if (a.hand.cards[i] !== b.hand.cards[i]) {
+          return b.hand.cards[i] - a.hand.cards[i];
+        }
+      }
+      return 0;
+    });
+
+    const bestHand = validPlayerHands[0].hand;
+    const winners = validPlayerHands.filter(ph => 
+      ph.hand && ph.hand.rank === bestHand.rank && 
+      JSON.stringify(ph.hand.cards) === JSON.stringify(bestHand.cards)
+    );
+
+    const winAmount = Math.floor(this.pot / winners.length);
+    
+    winners.forEach(winnerObj => {
+      const beforeChips = winnerObj.player.chips;
+      winnerObj.player.chips += winAmount;
+      const afterChips = winnerObj.player.chips;
+      
+      console.log(`💰 ${winnerObj.player.username}: ${beforeChips} + ${winAmount} = ${afterChips}`);
+      
+      // Find the actual 5-card combination that makes the winning hand
+      const bestFiveCards = this.findBestFiveCards(winnerObj.allCards, winnerObj.hand);
+      
+      // Format as simple rank strings (e.g., "KKK88", "A5432")
+      const handDisplay = this.formatHandForDisplay(bestFiveCards, winnerObj.hand);
+      
+      console.log(`🎴 Winning hand: ${winnerObj.hand.name} - ${handDisplay}`);
+      console.log(`🃏 Winning 5 cards: ${bestFiveCards.map(c => c.toString()).join(' ')}`);
+      
+      // ✅ Store final hand rank on player object so it gets saved
+      winnerObj.player.finalHandRank = winnerObj.hand.name;
+      
+      // Log with hand details
+      this.logAction(
+        winnerObj.player.username, 
+        `wins $${winAmount} with ${winnerObj.hand.name}`,
+        {
+          handDescription: winnerObj.hand.name,
+          winningHand: bestFiveCards.map(c => c.toString()),
+          handDisplay: handDisplay,
+          pot: winAmount
+        }
+      );
     });
     
-    return {
-      player,
-      hand,
-      allCards
-    };
-  });
-
-  playerHands.sort((a, b) => {
-    if (!a.hand || !b.hand) return 0;
-    
-    if (a.hand.rank !== b.hand.rank) {
-      return b.hand.rank - a.hand.rank;
+    // Log showdown results to hand log
+    if (this.currentHandLog) {
+      this.currentHandLog.showdown = {
+        playersShown: validPlayerHands.map(ph => ({
+          id: ph.player.id,
+          username: ph.player.username,
+          cards: ph.player.cards.map(c => c.toString()),
+          handRank: ph.hand.name,
+          handCards: ph.hand.cards
+        })),
+        winners: winners.map(w => ({
+          id: w.player.id,
+          username: w.player.username,
+          amountWon: winAmount,
+          handRank: w.hand.name
+        }))
+      };
     }
     
-    // Same hand rank - compare kickers
-    for (let i = 0; i < a.hand.cards.length; i++) {
-      if (a.hand.cards[i] !== b.hand.cards[i]) {
-        return b.hand.cards[i] - a.hand.cards[i];
-      }
-    }
-    return 0;
-  });
-
-  const bestHand = playerHands[0].hand;
-  const winners = playerHands.filter(ph => 
-    ph.hand && ph.hand.rank === bestHand.rank && 
-    JSON.stringify(ph.hand.cards) === JSON.stringify(bestHand.cards)
-  );
-
-  const winAmount = Math.floor(this.pot / winners.length);
-  
-  winners.forEach(winnerObj => {
-    const beforeChips = winnerObj.player.chips;
-    winnerObj.player.chips += winAmount;
-    const afterChips = winnerObj.player.chips;
-    
-    console.log(`💰 ${winnerObj.player.username}: ${beforeChips} + ${winAmount} = ${afterChips}`);
-    
-    // Find the actual 5-card combination that makes the winning hand
-    const bestFiveCards = this.findBestFiveCards(winnerObj.allCards, winnerObj.hand);
-    
-    // Format as simple rank strings (e.g., "KKK88", "A5432")
-    const handDisplay = this.formatHandForDisplay(bestFiveCards, winnerObj.hand);
-    
-    console.log(`🎴 Winning hand: ${winnerObj.hand.name} - ${handDisplay}`);
-    console.log(`🃏 Winning 5 cards: ${bestFiveCards.map(c => c.toString()).join(' ')}`);
-    
-    // Log with hand details
-    this.logAction(
-      winnerObj.player.username, 
-      `wins $${winAmount} with ${winnerObj.hand.name}`,
-      {
-        handDescription: winnerObj.hand.name,
-        winningHand: bestFiveCards.map(c => c.toString()),
-        handDisplay: handDisplay,
-        pot: winAmount
-      }
-    );
-  });
-  
-  // Log showdown results to hand log
-  if (this.currentHandLog) {
-    this.currentHandLog.showdown = {
-      playersShown: playerHands.map(ph => ({
-        id: ph.player.id,
-        username: ph.player.username,
-        cards: ph.player.cards.map(c => c.toString()),
-        handRank: ph.hand.name,
-        handCards: ph.hand.cards
-      })),
-      winners: winners.map(w => ({
-        id: w.player.id,
-        username: w.player.username,
-        amountWon: winAmount,
-        handRank: w.hand.name
-      }))
-    };
+    console.log('✅ === EVALUATION COMPLETE ===');
   }
-  
-  console.log('✅ === EVALUATION COMPLETE ===');
-}
 
   getGameState() {
     let currentPlayerId = null;

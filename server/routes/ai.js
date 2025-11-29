@@ -11,12 +11,16 @@ router.post('/analyze-hand', async (req, res) => {
     const { messages, maxTokens = 1000, hand } = req.body;
 
     console.log('Calling OpenAI API...');
+    console.log('📊 Received hand data:', JSON.stringify(hand, null, 2)); // ✅ ADD THIS
     
     // Determine if this is initial analysis or follow-up
     let processedMessages;
     
     if (hand && (!messages || messages.length === 0)) {
       // Initial analysis - format hand data
+      const formattedHand = formatHandForAnalysis(hand);
+      console.log('📝 Formatted hand for AI:', formattedHand); // ✅ ADD THIS
+      
       processedMessages = [
         {
           role: 'system',
@@ -24,7 +28,7 @@ router.post('/analyze-hand', async (req, res) => {
         },
         {
           role: 'user',
-          content: `Please analyze this poker hand in detail:\n\n${formatHandForAnalysis(hand)}`
+          content: `Please analyze this poker hand in detail:\n\n${formattedHand}`
         }
       ];
     } else if (messages && messages.length > 0) {

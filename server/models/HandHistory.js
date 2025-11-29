@@ -3,6 +3,13 @@ const pool = require('../config/database');
 class HandHistory {
   // Save a complete hand to the database
   static async saveHand(handLog) {
+    console.log('💾 ========== SAVING HAND TO DATABASE ==========');
+    console.log('📦 Full handLog:', JSON.stringify(handLog, null, 2));
+    console.log('👥 Ending stacks with cards:');
+    handLog.endingStacks.forEach(player => {
+      console.log(`  - ${player.username}: cards = ${JSON.stringify(player.cards)}`);
+    });
+    console.log('===============================================');
     const client = await pool.connect();
     
     try {
@@ -37,6 +44,7 @@ class HandHistory {
       const dbHandId = handResult.rows[0].id;
       
       // 2. Insert players who participated
+      // 2. Insert players who participated
       for (const player of handLog.endingStacks) {
         const startingStack = handLog.startingStacks.find(p => p.id === player.id);
         const isWinner = player.profit > 0;
@@ -46,23 +54,31 @@ class HandHistory {
         );
         const foldedAt = foldAction ? foldAction.phase : null;
         
+        // ✅ Get cards - handle both array and missing data
+        const playerCards = player.cards && player.cards.length > 0 
+          ? JSON.stringify(player.cards) 
+          : null;
+        
+        console.log(`💾 Saving player ${player.username} with cards:`, playerCards);
+        
         await client.query(
           `INSERT INTO hand_players (
             hand_id, user_id, username, position,
             starting_chips, ending_chips, profit,
-            is_winner, folded_at, cards
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            is_winner, folded_at, cards, final_hand_rank
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,  // ✅ 11 parameters
           [
-            dbHandId,
-            parseInt(player.id),
-            player.username,
-            startingStack.position,
-            startingStack.chips,
-            player.chips,
-            player.profit,
-            isWinner,
-            foldedAt,
-            JSON.stringify(player.cards || [])  // ✅ ADD THIS PARAMETER
+            dbHandId,                          // $1
+            parseInt(player.id),               // $2
+            player.username,                   // $3
+            startingStack.position,            // $4
+            startingStack.chips,               // $5
+            player.chips,                      // $6
+            player.profit,                     // $7
+            isWinner,                          // $8
+            foldedAt,                          // $9
+            playerCards,                       // $10
+            player.finalHandRank || null      // $11 ✅ MAKE SURE THIS IS HERE
           ]
         );
       }
