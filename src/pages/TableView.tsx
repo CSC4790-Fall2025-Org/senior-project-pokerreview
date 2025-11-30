@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import { TableService, TableData } from '../services/api/table';
 import { Button } from '../components/common/Button';
 import { motion } from 'framer-motion';
+import { wsService } from '../services/websocket';
 
 
 interface JoinAsPlayerModalProps {
@@ -134,6 +135,10 @@ export const TableView: React.FC = () => {
   const [animatedCards, setAnimatedCards] = useState<Array<{playerId: string, card: string, index: number}>>([]);
   const [animationComplete, setAnimationComplete] = useState(false);
   const [playersInCurrentHand, setPlayersInCurrentHand] = useState<Set<string>>(new Set());
+  const [wsConnected, setWsConnected] = useState(false);
+
+  const [lastActionPlayerId, setLastActionPlayerId] = useState<string | null>(null);
+  const [waitingForStateUpdate, setWaitingForStateUpdate] = useState(false);
   
 
   const seenEventsRef = useRef(new Set<string>());
@@ -226,19 +231,87 @@ export const TableView: React.FC = () => {
     type: string;
     cards?: string;
   }>>([]);
+
+  const loadTable = React.useCallback(async () => {
+    if (!tableId) return;
+    try {
+      const response = await TableService.getTable(tableId);
+      if (response.success && response.table) {
+        setTable(response.table);
+        setError(null);
+      } else {
+        setError(response.error || 'Failed to load table');
+      }
+    } catch (err) {
+      setError('Network error loading table');
+      console.error('Error loading table:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [tableId]);
   
   // Load table data
   useEffect(() => {
+    console.log('🔍 TableView mount effect - tableId:', tableId);
+    console.log('🔍 Current user:', user);
     if (!tableId) {
+      console.log('❌ No tableId, redirecting to dashboard');
       navigate('/dashboard');
       return;
     }
-  
-    loadTable();
-    // Refresh table data every 10 seconds
-    const interval = setInterval(loadTable, 10000);
-    return () => clearInterval(interval);
-  }, [tableId, navigate]);
+
+    console.log('✅ tableId check passed, continuing...');
+
+    const token = localStorage.getItem('auth_token');
+    console.log('🔑 Token from localStorage:', token ? 'EXISTS' : 'MISSING');
+    console.log('🔍 All localStorage keys:', Object.keys(localStorage));
+    console.log('🔑 Token from localStorage:', token ? 'EXISTS' : 'MISSING');
+    if (!token) {
+      console.log('❌ No token, redirecting to login');
+      navigate('/login');
+      return;
+    }
+    console.log('✅ Token check passed, about to loadTable...');
+
+    // Initial load
+    console.log('📞 About to call loadTable()');
+    loadTable().catch(err => {
+      console.error('❌ loadTable() failed:', err);
+    });
+    console.log('✅ loadTable() called, about to setup WebSocket');
+
+    // Connect WebSocket
+    console.log('🔌 Attempting WebSocket connection with token:', token ? 'present' : 'MISSING');
+    wsService.connect(token);
+    console.log('📡 Subscribing to table:', tableId);
+    wsService.subscribeToTable(tableId);
+
+    // Listen for table updates
+    const handleTableUpdate = (updatedTable: TableData) => {
+      console.log('✅ Received table update via WebSocket');
+      console.log('📦 Updated table data:', JSON.stringify(updatedTable, null, 2));
+      setTable(updatedTable);
+      setError(null);
+      setIsLoading(false);
+    };
+
+    // ✅ ADD: Listen for connection status
+    const handleAuthenticated = () => {
+      console.log('✅ WebSocket authenticated');
+      setWsConnected(true);
+    };
+
+    wsService.on('table_update', handleTableUpdate);
+    wsService.on('authenticated', handleAuthenticated);
+
+    // Cleanup
+    return () => {
+      wsService.off('table_update', handleTableUpdate);
+      wsService.off('authenticated', handleAuthenticated);
+      wsService.unsubscribeFromTable(tableId);
+      setWsConnected(false);
+    };
+  }, [tableId, navigate, loadTable]);
   
   // ✅ FIXED: Track game events directly from gameHistory (single source of truth)
 useEffect(() => {
@@ -295,24 +368,6 @@ useEffect(() => {
   }
 }, [table?.gamePhase, gameEvents.length]);
 
-  const loadTable = React.useCallback(async () => {
-    if (!tableId) return;
-    try {
-      const response = await TableService.getTable(tableId);
-      if (response.success && response.table) {
-        setTable(response.table);
-        setError(null);
-      } else {
-        setError(response.error || 'Failed to load table');
-      }
-    } catch (err) {
-      setError('Network error loading table');
-      console.error('Error loading table:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [tableId]);
-
 
   const handleJoinAsPlayer = async (buyInAmount: number) => {
     if (!tableId) return;
@@ -355,25 +410,55 @@ useEffect(() => {
 
   // NEW: player action handlers
   const handlePlayerAction = async (action: string, amount?: number) => {
-    if (!tableId || !table) return;
+    if (!tableId || !table || !user) return;
     
     setIsActionLoading(true);
+    setWaitingForStateUpdate(true);
+    setLastActionPlayerId(String(user.id));
+    
     try {
       console.log('Making action:', action, amount);
       const response = await TableService.playerAction(tableId, action, amount);
       if (response.success) {
-        await loadTable();
         setError(null);
+        // Don't clear isActionLoading - let WebSocket update do it
       } else {
         setError(response.error || `Failed to ${action}`);
+        setIsActionLoading(false);
+        setWaitingForStateUpdate(false);
+        setLastActionPlayerId(null);
       }
     } catch (err) {
       setError(`Network error during ${action}`);
       console.error(`Error during ${action}:`, err);
-    } finally {
       setIsActionLoading(false);
+      setWaitingForStateUpdate(false);
+      setLastActionPlayerId(null);
     }
   };
+
+  useEffect(() => {
+    if (waitingForStateUpdate && table && lastActionPlayerId && user) {
+      // Clear if turn changed OR if we received a complete state update with a valid currentPlayer
+      if (table.currentPlayer && String(table.currentPlayer) !== lastActionPlayerId) {
+        console.log('✅ Turn changed, clearing action lock');
+        setIsActionLoading(false);
+        setWaitingForStateUpdate(false);
+        setLastActionPlayerId(null);
+      } else if (table.gamePhase && table.currentPlayer) {
+        // Safety: Clear after 2 seconds if we got a valid state but turn didn't change
+        setTimeout(() => {
+          if (waitingForStateUpdate) {
+            console.log('⏱️ Timeout clearing action lock');
+            setIsActionLoading(false);
+            setWaitingForStateUpdate(false);
+            setLastActionPlayerId(null);
+          }
+        }, 2000);
+      }
+    }
+  }, [table?.currentPlayer, table?.gamePhase, waitingForStateUpdate, lastActionPlayerId, user]);
+
 
   const handleFold = () => handlePlayerAction('fold');
   const handleCheck = () => handlePlayerAction('check');
@@ -747,10 +832,10 @@ useEffect(() => {
             </div>
 
             {/* NEW: Action Buttons - REDESIGNED */}
-            {/* NEW: Action Buttons - REDESIGNED */}
             {isPlayer && 
               table.status === 'active' && 
               table.gamePhase !== 'finished' && 
+              table.gamePhase !== 'showdown' &&
               table.gamePhase !== 'showdown' && ( 
                 <div className="mt-6">
                 {/* Player Status Card with Buttons on One Line */}
@@ -797,7 +882,7 @@ useEffect(() => {
                       <div className="flex gap-2 flex-shrink-0">
                         <Button
                           onClick={handleFold}
-                          disabled={isActionLoading}
+                          disabled={isActionLoading || (waitingForStateUpdate && String(user?.id) === lastActionPlayerId)}
                           variant="secondary"
                           className="bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-red-500"
                         >
@@ -809,7 +894,7 @@ useEffect(() => {
                             {callAmount === 0 ? (
                               <Button
                                 onClick={handleCheck}
-                                disabled={isActionLoading}
+                                disabled={isActionLoading || (waitingForStateUpdate && String(user?.id) === lastActionPlayerId)}
                                 variant="secondary"
                                 className="bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-blue-500"
                               >
@@ -818,7 +903,7 @@ useEffect(() => {
                             ) : (
                               <Button
                                 onClick={handleCall}
-                                disabled={isActionLoading}
+                                disabled={isActionLoading || (waitingForStateUpdate && String(user?.id) === lastActionPlayerId)}
                                 className="bg-gradient-to-br from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 min-w-24 py-2 text-sm font-semibold shadow-lg border-2 border-green-500"
                               >
                                 {isActionLoading ? '...' : 
@@ -850,7 +935,7 @@ useEffect(() => {
                           <>
                             <Button
                               onClick={handleCheck}
-                              disabled={isActionLoading}
+                              disabled={isActionLoading || (waitingForStateUpdate && String(user?.id) === lastActionPlayerId)}
                               variant="secondary"
                               className="bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-blue-500"
                             >
@@ -874,6 +959,7 @@ useEffect(() => {
                   </div>
                 </div>
                 
+                {/* Message shown when NOT your turn */}
                 {!isMyTurn && (
                   <div className="text-center text-gray-400 py-3 bg-gray-800 rounded-xl border border-gray-700 mt-3">
                     Wait for your turn to act
@@ -1109,7 +1195,7 @@ useEffect(() => {
             </div>
 
             {/* Spectators List */}
-            {table.spectatorList && table.spectatorList.length > 0 && (
+            {/* {table.spectatorList && table.spectatorList.length > 0 && (
               <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
                 <h3 className="text-lg font-semibold text-white mb-4">
                   Spectators ({table.spectatorList.length})
@@ -1127,7 +1213,7 @@ useEffect(() => {
                   ))}
                 </div>
               </div>
-            )}
+            )} */}
           </div>
         </div>
       </main>

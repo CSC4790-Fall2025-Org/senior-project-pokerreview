@@ -67,7 +67,35 @@ router.get('/templates/all', TableController.getTableTemplates);
 router.get('/', TableController.getTables);
 
 // Get specific table details - this should come AFTER specific routes
-router.get('/:tableId', TableController.getTable);
+router.get('/:tableId', (req, res) => {
+  const { tableId } = req.params;
+  const userId = req.user.userId;
+  
+  const TableService = require('../services/tableService');
+  const table = TableService.getTable(tableId);
+  
+  if (!table) {
+    return res.status(404).json({ 
+      success: false, 
+      error: 'Table not found' 
+    });
+  }
+  
+  // ✅ Calculate userRole
+  const isPlayer = table.players.some(p => String(p.id) === String(userId));
+  const isSpectator = table.spectators?.some(s => String(s.id) === String(userId));
+  
+  const userRole = isPlayer ? 'player' : isSpectator ? 'spectator' : 'observer';
+  
+  res.json({ 
+    success: true, 
+    table: {
+      ...table,
+      userRole,
+      spectatorList: table.spectators || []
+    }
+  });
+});
 
 // Get game state for a table
 router.get('/:tableId/game-state', TableController.getGameState);

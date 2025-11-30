@@ -189,9 +189,10 @@ class TableService {
         currentPot: gameState.pot,
         communityCards: gameState.communityCards,
         gamePhase: gameState.gamePhase,
-        currentPlayer: gameState.currentPlayer, // This should be the player ID from game engine
+        currentPlayer: gameState.currentPlayer,
         lastRaiseAmount: gameState.lastRaiseAmount,
         dealerPosition: gameState.dealerPosition,
+        gameHistory: gameState.gameHistory,  
         players: table.players.map(player => {
           const gamePlayer = gameState.players.find(gp => gp.id === player.id);
           if (gamePlayer) {
@@ -199,7 +200,7 @@ class TableService {
               id: player.id,
               username: player.username,
               avatar_url: player.avatar_url,
-              position: player.position, // ✅ CRITICAL: Use table's position
+              position: player.position,
               chips: gamePlayer.chips,
               currentBet: gamePlayer.currentBet,
               isDealer: gamePlayer.isDealer,
@@ -320,7 +321,11 @@ class TableService {
     // ✅ ENHANCED: Better logging
     const sittingOutMsg = gameInProgress ? ' (sitting out until next hand)' : '';
     console.log(`User ${user.username} joined table ${table.name} as player at position ${position} with ${buyInAmount}${sittingOutMsg}`);
-    
+    // Broadcast table update to all subscribers
+    if (global.broadcastTableUpdate) {
+      global.broadcastTableUpdate(tableId, this.getTable(tableId));
+    }
+
     return { success: true, position, isSittingOut: gameInProgress };
   }  // Start a poker game
   static startGame(tableId) {
@@ -341,6 +346,11 @@ class TableService {
     
     // Start the first hand
     game.startNewHand();
+
+    // Broadcast table update to all subscribers
+    if (global.broadcastTableUpdate) {
+      global.broadcastTableUpdate(tableId, this.getTable(tableId));
+    }
     
     return true;
   }
@@ -372,6 +382,11 @@ class TableService {
             tablePlayer.chips = gamePlayer.chips;
           }
         });
+
+        // ✅ Broadcast AFTER all updates are done
+      if (global.broadcastTableUpdate) {
+        global.broadcastTableUpdate(tableId, this.getTable(tableId));
+      }
         
         // ✅ Check if hand just finished and save it
         if (gameState.gamePhase === 'finished' && game.completedHandLogToSave) {
@@ -417,6 +432,11 @@ class TableService {
               console.error('Hand data:', JSON.stringify(completedHandLog, null, 2));
             });
         }
+      }
+
+      // Broadcast table update to all subscribers
+      if (global.broadcastTableUpdate) {
+        global.broadcastTableUpdate(tableId, this.getTable(tableId));
       }
       
       return result;
@@ -494,7 +514,11 @@ class TableService {
     
     console.log(`User ${userIdStr} successfully left table ${tableId}`);
     console.log(`Table now has ${table.players.length} players and ${table.spectators.length} spectators`);
-    
+
+    // Broadcast table update to all subscribers
+    if (global.broadcastTableUpdate) {
+      global.broadcastTableUpdate(tableId, this.getTable(tableId));
+    }
     return true;
   }
   // Create duplicate table when one fills up

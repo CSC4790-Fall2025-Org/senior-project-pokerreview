@@ -745,15 +745,24 @@ class PokerGame {
     
     // ✅ Auto-start after delay
     setTimeout(() => {
-      console.log('⏰ Auto-starting next hand after early finish...');
+      console.log('⏰ Auto-starting next hand after showdown delay...');
       const playersWithChips = this.players.filter(p => p.chips > 0 && p.isActive);
       if (playersWithChips.length >= 2) {
         this.startNewHand();
+        
+        // ✅ ADD THIS: Broadcast the new hand state immediately
+        if (global.broadcastTableUpdate) {
+          const TableService = require('../services/tableService');
+          const updatedTable = TableService.getTable(this.tableId);
+          if (updatedTable) {
+            global.broadcastTableUpdate(this.tableId, updatedTable);
+          }
+        }
       } else {
-        console.log('⚠️ Not enough players to continue.');
+        console.log('⚠️ Not enough players to continue. Game ending.');
         this.gamePhase = 'waiting';
       }
-    }, 5000);
+    }, 8000);
   }
 
   dealRemainingCards() {
@@ -905,6 +914,18 @@ class PokerGame {
     this.lastRaiseAmount = 0;
     this.bettingRound++;
 
+    console.log('=== nextPhase() DEBUG ===');
+    console.log('Current gamePhase:', this.gamePhase);
+    console.log('dealerPosition:', this.dealerPosition);
+    console.log('All players:', this.players.map((p, idx) => ({
+      index: idx,
+      id: p.id,
+      username: p.username,
+      position: p.position,
+      isDealer: p.isDealer
+    })));
+    console.log('========================');
+
     switch (this.gamePhase) {
       case 'preflop':
         this.gamePhase = 'flop';
@@ -932,12 +953,11 @@ class PokerGame {
 
     // ✅ FIXED: Correct heads-up position logic for postflop
     if (this.players.length === 2) {
-      // In heads-up postflop, the DEALER (small blind) acts first
-      // This is OPPOSITE from preflop where big blind can close action
+      // In heads-up postflop, the DEALER acts first (button has position)
       this.currentPlayerIndex = this.dealerPosition;
       
-      const dealer = this.players[this.dealerPosition];
-      console.log(`Heads-up postflop: dealer/SB (${dealer.username}) at position ${this.dealerPosition} acts first`);
+      const firstToAct = this.players[this.dealerPosition];
+      console.log(`Heads-up postflop: dealer/button (${firstToAct.username}) at position ${this.dealerPosition} acts first`);
     } else {
       // Multi-way: First active player after dealer acts first (small blind position)
       this.currentPlayerIndex = this.getNextActivePlayer((this.dealerPosition + 1) % this.players.length);
@@ -1058,6 +1078,16 @@ class PokerGame {
       const playersWithChips = this.players.filter(p => p.chips > 0 && p.isActive);
       if (playersWithChips.length >= 2) {
         this.startNewHand();
+        
+        // ✅ CRITICAL: Broadcast the new hand state immediately
+        if (global.broadcastTableUpdate) {
+          const TableService = require('../services/tableService');
+          const updatedTable = TableService.getTable(this.tableId);
+          if (updatedTable) {
+            console.log('📡 Broadcasting new hand state to all clients');
+            global.broadcastTableUpdate(this.tableId, updatedTable);
+          }
+        }
       } else {
         console.log('⚠️ Not enough players to continue. Game ending.');
         this.gamePhase = 'waiting';
@@ -1071,23 +1101,33 @@ class PokerGame {
     const playerHands = players.map(player => {
       // ✅ Convert string cards back to Card objects if needed
       const playerCards = player.cards.map(card => {
-        if (typeof card === 'string') {
-          // Parse string like "9d" into Card object
-          const suit = card.slice(-1);  // Last character is suit
-          const rank = card.slice(0, -1); // Everything before last char is rank
-          return new Card(suit, rank);
-        }
-        return card; // Already a Card object
-      });
-      
-      const communityCards = this.communityCards.map(card => {
+        if (card instanceof Card) return card;
         if (typeof card === 'string') {
           const suit = card.slice(-1);
           const rank = card.slice(0, -1);
           return new Card(suit, rank);
         }
-        return card;
-      });
+        // If it's already an object with suit/rank
+        if (card.suit && card.rank) {
+          return new Card(card.suit, card.rank);
+        }
+        console.error('❌ Invalid card format:', card);
+        return null;
+      }).filter(c => c !== null);
+      
+      const communityCards = this.communityCards.map(card => {
+        if (card instanceof Card) return card;
+        if (typeof card === 'string') {
+          const suit = card.slice(-1);
+          const rank = card.slice(0, -1);
+          return new Card(suit, rank);
+        }
+        if (card.suit && card.rank) {
+          return new Card(card.suit, card.rank);
+        }
+        console.error('❌ Invalid community card:', card);
+        return null;
+      }).filter(c => c !== null);
       
       const allCards = [...playerCards, ...communityCards];
       
