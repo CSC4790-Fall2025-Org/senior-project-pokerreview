@@ -144,15 +144,20 @@ export const TableView: React.FC = () => {
   const seenEventsRef = useRef(new Set<string>());
 
   // Helper function to get card final position (matching exactly where static cards were)
+    // First, find this section in getCardPosition function (around line 28-35):
   const getCardPosition = (playerPosition: number, cardIndex: number, maxPlayers: number) => {
     const { x: playerX, y: playerY } = getPlayerPosition(playerPosition, maxPlayers);
     
-    // Match the exact positioning from the static cards: "space-x-1 mt-2"
-    // space-x-1 in Tailwind = 0.25rem = 4px between cards
-    // mt-2 in Tailwind = 0.5rem = 8px margin top
-    const cardSpacing = 10; // Half card width + spacing for side-by-side placement
-    const cardOffsetX = cardIndex === 0 ? -cardSpacing : cardSpacing; // Left card, right card
-    const cardOffsetY = 24; // Below player info, matching mt-2 + some buffer
+    const player = table?.players.find(p => p.position === playerPosition);
+    const isCurrentUser = player?.id === user?.id;
+    
+    // Position cards to the right of the player avatar
+    const cardWidth = 30; // Card width for spacing
+    const cardSpacing = 3; // Space between cards
+    const horizontalOffset = isCurrentUser ? 20 : 56; // Changed from 24 to 20 for current user
+    // First card and second card positioned side by side to the right
+    const cardOffsetX = horizontalOffset + (cardIndex * (cardWidth + cardSpacing));
+    const cardOffsetY = 0; // Vertically centered with avatar
     
     return {
       x: playerX,
@@ -482,10 +487,30 @@ useEffect(() => {
   };
 
   const getPlayerPosition = (position: number, maxPlayers: number) => {
-    const angle = (position / maxPlayers) * 360;
-    const radius = 45;
-    const x = 50 + radius * Math.cos((angle - 90) * Math.PI / 180);
-    const y = 50 + radius * Math.sin((angle - 90) * Math.PI / 180);
+    // Custom positioning for symmetrical layouts
+    const radiusX = 40; // Reduced to keep cards on table
+    const radiusY = 31; // Reduced to keep cards on table
+    
+    let angle: number;
+    
+    if (maxPlayers === 6) {
+      // 6 players: evenly distributed
+      angle = (position / maxPlayers) * 360;
+    } else if (maxPlayers === 8) {
+      // 8 players: evenly distributed
+      angle = (position / maxPlayers) * 360;
+    } else if (maxPlayers === 9) {
+      // 9 players: 1 top, 2 upper sides, 2 middle sides, 2 bottom, 2 lower sides
+      // Symmetrical across Y-axis with 2 players at bottom
+      const angles = [0, 40, 80, 135, 165, 195, 225, 280, 320];
+      angle = angles[position];
+    } else {
+      // All other tables: evenly distributed with equal spacing
+      angle = (position / maxPlayers) * 360;
+    }
+    
+    const x = 50 + radiusX * Math.cos((angle - 90) * Math.PI / 180);
+    const y = 50 + radiusY * Math.sin((angle - 90) * Math.PI / 180);
     return { x, y };
   };
 
@@ -692,66 +717,100 @@ useEffect(() => {
                       return (
                         <div
                           key={player.id}
-                          className="absolute transform -translate-x-1/2 -translate-y-1/2 z-20"
-                          style={{ left: `${x}%`, top: `${y}%` }}
+                          className="absolute z-20"
+                          style={{ 
+                            left: `${x}%`, 
+                            top: `${y}%`,
+                            transform: 'translate(-50%, -50%)'
+                          }}
                         >
-                          <div className={`text-center ${isCurrentUser ? 'bg-gray-800 bg-opacity-50 ring-2 ring-poker-gold rounded-lg p-3' : ''}`}>
-                            <div className={`w-16 h-16 rounded-full border-4 ${
-                              player.isDealer ? 'border-poker-gold shadow-lg shadow-yellow-500/50' :
-                              player.isSmallBlind ? 'border-blue-400 shadow-lg shadow-blue-400/50' :
-                              player.isBigBlind ? 'border-red-400 shadow-lg shadow-red-400/50' :
-                              'border-gray-600'
-                            } bg-gradient-to-br from-poker-gold to-yellow-600 flex items-center justify-center mx-auto mb-2`}>
-                              <span className="text-gray-900 font-bold text-lg">
-                                {player.username.charAt(0).toUpperCase()}
-                              </span>
+                          <div className="relative">
+                            {/* Border container - positioned so avatar stays at origin */}
+                            {isCurrentUser && animationComplete && player.cards && player.cards.length > 0 && (
+                              <div 
+                                className={`absolute top-1/2 -translate-y-1/2 bg-gray-800 bg-opacity-50 ring-2 ring-poker-gold rounded-2xl p-[15px] pointer-events-none ${
+                                  player.position >= 5 ? 'right-0' : 'left-0'
+                                }`}
+                              >
+                                {/* Invisible placeholder to define border size */}
+                                <div className={`flex items-center gap-1 opacity-0 ${
+                                  player.position >= 5 ? 'flex-row-reverse' : ''
+                                }`}>
+                                  <div className="w-16 h-28"></div>
+                                  <div className="flex gap-1">
+                                    {player.cards.map((_, index) => (
+                                      <div key={`placeholder-${index}`} className="w-12 h-16"></div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Avatar - always in the same position, higher z-index */}
+                            <div className="text-center relative z-10 ml-1">
+                              <div className={`w-16 h-16 rounded-full border-4 ${
+                                player.isDealer ? 'border-poker-gold shadow-lg shadow-yellow-500/50' :
+                                player.isSmallBlind ? 'border-blue-400 shadow-lg shadow-blue-400/50' :
+                                player.isBigBlind ? 'border-red-400 shadow-lg shadow-red-400/50' :
+                                'border-gray-600'
+                              } bg-gradient-to-br from-poker-gold to-yellow-600 flex items-center justify-center mx-auto mb-2`}>
+                                <span className="text-gray-900 font-bold text-lg">
+                                  {player.username.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              
+                              <div className="text-white font-semibold text-sm mb-1 drop-shadow-md">
+                                {player.username}
+                                {isCurrentUser && <span className="text-poker-gold ml-1">(You)</span>}
+                              </div>
+                              
+                              <div className="text-poker-gold font-bold text-sm drop-shadow-md">
+                                {formatCurrency(player.chips)}
+                              </div>
+                              
+                              <div className="text-xs mt-1 space-x-1">
+                                {player.isDealer && <span className="text-poker-gold bg-yellow-900 px-1 rounded">D</span>}
+                                {player.isSmallBlind && <span className="text-blue-400 bg-blue-900 px-1 rounded">SB</span>}
+                                {player.isBigBlind && <span className="text-red-400 bg-red-900 px-1 rounded">BB</span>}
+                              </div>
                             </div>
                             
-                            <div className="text-white font-semibold text-sm mb-1 drop-shadow-md">
-                              {player.username}
-                              {isCurrentUser && <span className="text-poker-gold ml-1">(You)</span>}
-                            </div>
-                            
-                            <div className="text-poker-gold font-bold text-sm drop-shadow-md">
-                              {formatCurrency(player.chips)}
-                            </div>
-                            
-                            <div className="text-xs mt-1 space-x-1">
-                              {player.isDealer && <span className="text-poker-gold bg-yellow-900 px-1 rounded">D</span>}
-                              {player.isSmallBlind && <span className="text-blue-400 bg-blue-900 px-1 rounded">SB</span>}
-                              {player.isBigBlind && <span className="text-red-400 bg-red-900 px-1 rounded">BB</span>}
-                            </div>
-                            {/* Static cards after animation completes - show for ALL phases */}
-                            {animationComplete && (
-                              <div className="flex justify-center space-x-1 mt-2">
-                                {isCurrentUser && player.cards && player.cards.length > 0 ? (
-                                  // Show current user's cards face-up
-                                  player.cards.map((card, index) => (
+                            {/* Cards for current user - positioned to the right, higher z-index */}
+                            {animationComplete && isCurrentUser && player.cards && player.cards.length > 0 && (
+                              <div className="absolute left-full top-1/2 -translate-y-1/2 flex gap-1 ml-2 z-10">
+                                {player.cards.map((card, index) => (
+                                  <div key={`static-user-${index}`} className="w-12 h-16 flex-shrink-0">
                                     <img
-                                      key={`static-user-${index}`}
                                       src={`/cards/${card}.svg`}
                                       alt={card}
-                                      className="w-12 h-16 rounded shadow-lg border border-gray-300"
+                                      className="w-full h-full object-contain rounded shadow-lg"
+                                      onError={(e) => {
+                                        console.log('Card failed to load:', card);
+                                        e.currentTarget.src = '/cards/card_back.png';
+                                      }}
                                     />
-                                  ))
-                                ) : !isCurrentUser && 
-                                    player.cards && 
-                                    player.cards.length > 0 && 
-                                    !(player as any).isFolded && 
-                                    !(player as any).isSittingOut ? (
-                                  // ✅ FIXED: Check if they have cards instead of playersInCurrentHand
-                                  Array.from({ length: 2 }).map((_, index) => (
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            
+                            {/* Cards for other players - positioned to the right */}
+                            {animationComplete && !isCurrentUser && player.cards && player.cards.length > 0 && 
+                              !(player as any).isFolded && 
+                              !(player as any).isSittingOut && (
+                              <div className="absolute left-full top-1/2 -translate-y-1/2 flex gap-1 ml-3">
+                                {Array.from({ length: 2 }).map((_, index) => (
+                                  <div key={`static-opp-${index}`} className="w-12 h-16 flex-shrink-0">
                                     <img
-                                      key={`static-opp-${index}`}
                                       src="/cards/card_back.png"
                                       alt="face-down card"
-                                      className="w-12 h-16 rounded shadow-lg border border-gray-300"
+                                      className="w-full h-full object-contain rounded shadow-lg"
                                     />
-                                  ))
-                                ) : null}
+                                  </div>
+                                ))}
                               </div>
-                            )}                  
-                            </div>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -799,8 +858,12 @@ useEffect(() => {
                         >
                           <img
                             src={cardSrc}
-                            alt={isCurrentUser && card !== 'back' ? card : 'face-down card'}
-                            className="w-full h-full rounded shadow-lg border border-gray-300"
+                            alt={isCurrentUser && card !== 'card_back' ? card : 'face-down card'}
+                            className="w-full h-full object-contain rounded shadow-lg"
+                            onError={(e) => {
+                              console.log('Animated card failed to load:', cardSrc);
+                              e.currentTarget.src = '/cards/card_back.png';
+                            }}
                           />
                         </motion.div>
                       );
