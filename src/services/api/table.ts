@@ -10,11 +10,14 @@ export interface TablePlayer {
   username: string;
   chips: number;
   position: number;
-  isDealer: boolean;
-  isSmallBlind: boolean;
-  isBigBlind: boolean;
+  
+  // FIX: Make positional booleans optional to match server's intermittent data structure
+  isDealer?: boolean;      
+  isSmallBlind?: boolean;  
+  isBigBlind?: boolean;    
+  
   cards?: string[];
-  currentBet?: number;   // <-- add this
+  currentBet?: number;
 }
 
 export interface TableSpectator {

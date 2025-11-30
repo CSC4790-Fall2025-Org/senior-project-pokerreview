@@ -1,9 +1,9 @@
-// src/pages/Profile.tsx - REDESIGNED VERSION
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
+// 👇 FIX: Destructure the new updateUser function
+import { useAuthStore } from '../store/authStore'; 
 import { UserService, UserProfile } from '../services/api/user';
-import { TableService } from '../services/api/table'; // Import TableService to mock Hand History API call
+import { TableService } from '../services/api/table'; 
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { HandHistory } from '../components/common/HandHistory';
@@ -15,18 +15,21 @@ interface RecentHand {
   time: string;
   result_text: string;
   profit: number;
+  rawHandData: any; 
 }
 
 export const Profile: React.FC = () => {
-  const { user, logout } = useAuthStore();
+  // 👇 FIX: Include updateUser from the store
+  const { user, logout, updateUser } = useAuthStore(); 
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [showHandHistory, setShowHandHistory] = useState(false);
-  const [selectedHandInModal, setSelectedHandInModal] = useState<any>(null); // State to pass a specific hand to the modal
+  const [selectedHandInModal, setSelectedHandInModal] = useState<any>(null); 
   const [recentHands, setRecentHands] = useState<RecentHand[]>([]);
+  const [isUploading, setIsUploading] = useState(false); 
   
   const [formData, setFormData] = useState({
     username: user?.username || '',
@@ -41,7 +44,12 @@ export const Profile: React.FC = () => {
       // 1. Load Profile
       const profileResponse = await UserService.getProfile();
       if (profileResponse.success && profileResponse.user) {
-        setUserProfile(profileResponse.user);
+        setUserProfile(profileResponse.user); 
+        
+        // 🚀 FIX 1: Destructure and remove the incompatible 'id' property before calling updateUser
+        const { id, ...updateData } = profileResponse.user;
+        updateUser(updateData);
+        
         setFormData({
           username: profileResponse.user.username,
           email: profileResponse.user.email,
@@ -52,7 +60,7 @@ export const Profile: React.FC = () => {
 
       // 2. Load Recent Hands (Mocked API call for structure)
       try {
-        const handsResponse = await UserService.getUserHandHistory(10); // Load top 10 for preview
+        const handsResponse = await UserService.getUserHandHistory(10); 
         if (handsResponse.success && handsResponse.hands) {
           const handsData: RecentHand[] = handsResponse.hands.map((hand: any) => {
             const playerResult = hand.all_players?.find((p: any) => p.username === user?.username);
@@ -63,7 +71,7 @@ export const Profile: React.FC = () => {
               table_name: tableIdPart || 'Unknown Table',
               time: new Date(hand.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               profit: profit,
-              rawHandData: hand, // Store raw data to pass to modal
+              rawHandData: hand, 
               result_text: profit > 0 ? 'Win' : profit < 0 ? 'Loss' : 'Chop',
             };
           });
@@ -77,13 +85,44 @@ export const Profile: React.FC = () => {
     };
 
     loadData();
-  }, [user?.username]);
+  }, [user?.username, updateUser]); // Added updateUser to dependencies
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value
     }));
+  };
+
+  // NEW HANDLER: For avatar upload
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setError(null);
+
+    try {
+      const response = await UserService.uploadAvatar(file);
+
+      if (response.success && response.user) {
+        // 🚀 FIX 2: Destructure and remove the incompatible 'id' property before calling updateUser
+        const { id, ...updateData } = response.user;
+        
+        // 1. Update userProfile state with the new avatar_url (for immediate view update)
+        setUserProfile(response.user); 
+        // 2. Update the global auth store state (for persistence across pages/refreshes)
+        updateUser(updateData);
+      } else {
+        setError(response.error || 'Failed to upload image.');
+      }
+    } catch (err) {
+      setError('An unexpected error occurred during upload.');
+    } finally {
+      setIsUploading(false);
+      // Reset the file input value so the user can upload the same file again
+      e.target.value = ''; 
+    }
   };
 
   const handleSave = async () => {
@@ -94,9 +133,12 @@ export const Profile: React.FC = () => {
       const response = await UserService.updateProfile(formData);
       
       if (response.success && response.user) {
+        // 🚀 FIX 3: Destructure and remove the incompatible 'id' property before calling updateUser
+        const { id, ...updateData } = response.user;
+        
         setUserProfile(response.user);
+        updateUser(updateData); // Update store after name/email change too
         setIsEditing(false);
-        // You might also want to update the auth store with the new user info
       } else {
         setError(response.error || 'Failed to update profile');
       }
@@ -146,7 +188,8 @@ export const Profile: React.FC = () => {
     );
   }
 
-  const displayUser = userProfile || user;
+  // 👇 FIX: displayUser will now reliably have the latest avatar_url from the store if userProfile is null
+  const displayUser = userProfile || user; 
   const winRate = userProfile?.win_rate || 0;
   const profitColor = winRate >= 50 ? 'text-green-400' : winRate > 0 ? 'text-yellow-400' : 'text-red-400';
   const totalWinnings = userProfile?.total_winnings || 0;
@@ -182,11 +225,46 @@ export const Profile: React.FC = () => {
           <div className="bg-gray-800 rounded-xl p-8 border border-gray-700 shadow-2xl">
             <div className="flex items-start justify-between mb-8">
               <div className="flex items-center">
-                <div className="w-24 h-24 bg-gradient-to-br from-poker-gold to-yellow-600 rounded-full flex items-center justify-center mr-6 shadow-xl">
-                  <span className="text-gray-900 font-extrabold text-4xl">
-                    {displayUser?.username.charAt(0).toUpperCase()}
-                  </span>
-                </div>
+                
+                {/* START: AVATAR UPLOAD COMPONENT */}
+                <div className="relative w-24 h-24 mr-6">
+                {/* Avatar Display */}
+                {displayUser?.avatar_url ? (
+                  <img
+                    src={displayUser.avatar_url}
+                    alt={`${displayUser.username}'s Avatar`}
+                    className="w-full h-full rounded-full object-cover border-4 border-poker-gold shadow-xl"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-poker-gold to-yellow-600 rounded-full flex items-center justify-center shadow-xl">
+                    <span className="text-gray-900 font-extrabold text-4xl">
+                      {displayUser?.username.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+                
+                {/* Upload Button */}
+                <input
+                  type="file"
+                  id="avatar-upload"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  className="hidden"
+                  disabled={isUploading}
+                />
+                <label
+                  htmlFor="avatar-upload"
+                  className="absolute bottom-0 right-0 w-8 h-8 bg-blue-600 hover:bg-blue-700 rounded-full flex items-center justify-center cursor-pointer border-2 border-gray-800 transition-colors"
+                >
+                  {isUploading ? (
+                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                  ) : (
+                    <span className="text-white text-lg leading-none transform translate-y-[-1px]">▲</span>
+                  )}
+                </label>
+              </div>
+              {/* END: AVATAR UPLOAD COMPONENT */}
+              
                 <div>
                   <h1 className="text-4xl font-extrabold text-white">{displayUser?.username}</h1>
                   <p className="text-gray-400 mt-1">

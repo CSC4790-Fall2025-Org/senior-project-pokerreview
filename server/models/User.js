@@ -11,20 +11,20 @@ class User {
 
   static async findById(id) {
     const result = await pool.query(
-      'SELECT id, username, email, created_at FROM users WHERE id = $1',
+      'SELECT id, username, email, avatar_url, created_at FROM users WHERE id = $1',
       [id]
     );
     return result.rows[0];
   }
 
   static async findByIdWithStats(id) {
-    // Query without biggest_pot column
     const result = await pool.query(
       `SELECT 
         u.id, 
         u.username, 
         u.email, 
         u.created_at,
+        u.avatar_url,             -- 💡 FIX: ADDED u.avatar_url from the users table
         COALESCE(us.games_played, 0) as games_played,
         COALESCE(us.hands_played, 0) as hands_played,
         COALESCE(us.hands_won, 0) as hands_won,
@@ -43,7 +43,7 @@ class User {
     }
     
     return result.rows[0];
-  }
+}
 
   static async create({ username, email, passwordHash }) {
     const client = await pool.connect();
@@ -124,6 +124,30 @@ class User {
     
     const result = await pool.query(query, params);
     return result.rows.length > 0;
+  }
+
+  static async updateAvatarUrl(id, avatarUrl) {
+    try {
+        // 1. Update ONLY the avatar_url in the users table
+        const updateResult = await pool.query(
+            `UPDATE users 
+             SET avatar_url = $1 
+             WHERE id = $2`, 
+            [avatarUrl, id]
+        );
+        
+        if (updateResult.rowCount === 0) {
+            return null; // Update failed
+        }
+
+        // 2. Fetch the COMPLETE, updated profile using the fixed method above
+        const updatedUserWithStats = await this.findByIdWithStats(id); 
+        
+        return updatedUserWithStats; 
+    } catch (error) {
+        console.error('Database update avatar error:', error);
+        throw error;
+    }
   }
 
   static async getRecentGames(userId, limit = 10) {

@@ -2,6 +2,7 @@
 console.log('🔧 DEBUG: Loading tableService.js');
 const { PokerGame } = require('./pokerEngine');
 const HandHistory = require('../models/HandHistory');
+const User = require('../models/User'); // Ensure User model is imported
 
 class TableService {
   static activeTables = new Map();
@@ -228,14 +229,17 @@ class TableService {
     const table = this.activeTables.get(tableId);
     if (!table) return false;
     
+    // 💡 FIX 2: Consistently use userId from the token payload and cast to string for comparison
+    const userIdStr = String(user.userId || user.id); // Check both properties
+    
     // Check if already spectating or playing
-    if (table.spectators.find(s => s.id === user.id) || 
-        table.players.find(p => p.id === user.id)) {
+    if (table.spectators.find(s => String(s.id) === userIdStr) || 
+        table.players.find(p => String(p.id) === userIdStr)) {
       return true;
     }
     
     table.spectators.push({
-      id: user.id,
+      id: userIdStr, // Use string ID
       username: user.username,
       avatar_url: user.avatar_url,
       joinedAt: new Date()
@@ -246,12 +250,22 @@ class TableService {
     return true;
   }
 
-  static joinAsPlayer(tableId, user, buyInAmount) {
+  static async joinAsPlayer(tableId, user, buyInAmount) {
     const table = this.activeTables.get(tableId);
     if (!table) {
       return { success: false, error: 'Table not found' };
     }
     
+    // 🚀 CRITICAL FIX: Safely extract and validate the User ID, checking for both 'userId' (from JWT) and 'id'
+    // The previous code only checked user.userId, which was causing the "CRITICAL: User ID not found" error.
+    const userId = user.userId || user.id;
+    
+    if (!userId) {
+      console.error('CRITICAL: User ID not found in token payload (checked .userId and .id).');
+      return { success: false, error: 'Authentication error: User ID missing' };
+    }
+    const userIdStr = String(userId);
+
     // Check if table is full
     if (table.players.length >= table.maxPlayers) {
       return { success: false, error: 'Table is full' };
@@ -265,9 +279,22 @@ class TableService {
       };
     }
     
-    // Check if already playing
-    if (table.players.find(p => p.id === user.id)) {
+    // Check if already playing using the consistent string ID
+    if (table.players.find(p => String(p.id) === userIdStr)) {
       return { success: false, error: 'Already playing at this table' };
+    }
+    
+    // Fetch the user's latest avatar_url using the correct string ID
+    let avatarUrl = user.avatar_url;
+    try {
+        const fullUser = await User.findById(userIdStr);
+        if (fullUser) {
+             avatarUrl = fullUser.avatar_url || avatarUrl || null;
+        } else {
+             console.error(`User ID ${userIdStr} not found in DB during join.`);
+        }
+    } catch (err) {
+        console.error('Error fetching full user data for join:', err);
     }
     
     // Find available position - CRITICAL: Check which positions are taken
@@ -293,22 +320,22 @@ class TableService {
     
     // Add player with the assigned position
     const player = {
-      id: user.id,
+      id: userIdStr, // Use the reliable string ID
       username: user.username,
-      avatar_url: user.avatar_url,
+      avatar_url: avatarUrl, // Use the latest fetched URL
       chips: buyInAmount,
       position, // This position will be preserved
       isActive: true,
       hasActed: false,
       lastSeen: new Date(),
       cards: [],
-      isSittingOut: gameInProgress  // ✅ NEW: Sit out if hand in progress
+      isSittingOut: gameInProgress  // Sit out if hand in progress
     };
     
     table.players.push(player);
     
     // Remove from spectators if they were spectating
-    table.spectators = table.spectators.filter(s => s.id !== user.id);
+    table.spectators = table.spectators.filter(s => String(s.id) !== userIdStr);
     
     // Start game if minimum players reached
     if (table.players.length >= 2 && table.status === 'waiting') {
@@ -554,10 +581,6 @@ class TableService {
       }
     }
     
-    if (cleanedUp > 0) {
-      console.log(`Cleaned up ${cleanedUp} inactive tables`);
-    }
-    
     // Ensure we always have at least one table of each template
     this.TABLE_TEMPLATES.forEach(template => {
       const hasActiveTable = Array.from(this.activeTables.values())
@@ -570,9 +593,6 @@ class TableService {
       }
     });
   }
-
-// FIXED: Remove duplicate getGameState method definition
-// This section should appear only ONCE at the end of your TableService class
 
   // Get game state for a specific table
   static getGameState(tableId) {

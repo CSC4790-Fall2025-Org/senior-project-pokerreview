@@ -141,6 +141,9 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+const uploadsPath = path.join(__dirname, 'uploads'); 
+app.use('/uploads', express.static(uploadsPath));
+
 app.use((req,res,next)=>{ console.log('[REQ]', req.method, req.url); next(); });
 
 app.use('/api/ai', aiRoutes);

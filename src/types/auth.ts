@@ -3,6 +3,7 @@ export interface User {
   email: string;
   username: string;
   createdAt: string;
+  avatar_url?: string;
   bankroll?: number;
   gamesPlayed?: number;
   gamesWon?: number;
@@ -26,6 +27,7 @@ export interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  updateUser: (newUserData: Partial<User>) => void;
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (credentials: RegisterCredentials) => Promise<void>;
   logout: () => Promise<void>;

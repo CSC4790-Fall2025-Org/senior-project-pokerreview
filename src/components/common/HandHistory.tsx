@@ -86,7 +86,7 @@ export const HandHistory: React.FC<HandHistoryProps> = ({ isOpen, onClose, initi
     <>
       <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50"> {/* Increased opacity for better focus */}
         <div className={`bg-gray-800 rounded-xl w-full max-w-7xl max-h-[90vh] flex flex-col transition-all duration-300 border border-gray-700 shadow-2xl ${
-          aiAnalysisHand ? 'mr-96' : ''
+          aiAnalysisHand ? 'mr-[32rem]' : ''
         }`}>
           {/* Header */}
           <div className="flex justify-between items-center p-6 border-b border-gray-700">

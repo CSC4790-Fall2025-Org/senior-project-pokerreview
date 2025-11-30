@@ -2,11 +2,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { TableService, TableData } from '../services/api/table';
+import { TableService, TableData, TablePlayer } from '../services/api/table';
 import { Button } from '../components/common/Button';
 import { motion } from 'framer-motion';
 import { wsService } from '../services/websocket';
 
+interface ExtendedTablePlayer extends TablePlayer {
+  avatar_url?: string | null;
+  isDealer?: boolean;      
+  isSmallBlind?: boolean;  
+  isBigBlind?: boolean;    
+}
+interface ExtendedTableData extends TableData {
+  players: ExtendedTablePlayer[];
+}
 
 interface JoinAsPlayerModalProps {
   isOpen: boolean;
@@ -125,7 +134,7 @@ export const TableView: React.FC = () => {
   const { tableId } = useParams<{ tableId: string }>();
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const [table, setTable] = useState<TableData | null>(null);
+  const [table, setTable] = useState<ExtendedTableData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -151,13 +160,14 @@ export const TableView: React.FC = () => {
     const player = table?.players.find(p => p.position === playerPosition);
     const isCurrentUser = player?.id === user?.id;
     
-    // Position cards to the right of the player avatar
-    const cardWidth = 30; // Card width for spacing
-    const cardSpacing = 3; // Space between cards
-    const horizontalOffset = isCurrentUser ? 20 : 56; // Changed from 24 to 20 for current user
-    // First card and second card positioned side by side to the right
+    // Cards will be positioned INSIDE the player container box
+    const cardWidth = 40; // Increased from 30
+    const cardSpacing = 4;
+    
+    // For animated cards during dealing
+    const horizontalOffset = isCurrentUser ? 80 : 80; // Offset from center
     const cardOffsetX = horizontalOffset + (cardIndex * (cardWidth + cardSpacing));
-    const cardOffsetY = 0; // Vertically centered with avatar
+    const cardOffsetY = 0;
     
     return {
       x: playerX,
@@ -382,10 +392,14 @@ useEffect(() => {
       const response = await TableService.joinAsPlayer(tableId, buyInAmount);
       if (response.success) {
         setShowJoinModal(false);
-        // ✅ Clear stale data and force fresh load
-        setTable(null);
-        setIsLoading(true);
-        await loadTable();
+        // Do NOT set setTable(null) or setIsLoading(true) here.
+        // The server will broadcast the table update via WebSocket.
+        // We rely on the WebSocket to update the state and seat the player.
+        
+        // OPTIONAL: Call loadTable for immediate visual feedback, but it's not strictly necessary 
+        // if your WS is working. If you keep it, ensure no errors occur.
+        // await loadTable();
+        
       } else {
         setError(response.error || 'Failed to join as player');
       }
@@ -393,8 +407,12 @@ useEffect(() => {
       setError('Network error joining table');
       console.error('Error joining as player:', err);
     } finally {
-      setIsJoining(false);
-      setIsLoading(false);
+      // The WS listener should be responsible for setting isLoading=false 
+      // once the 'table_update' is received.
+      setIsJoining(false); 
+      // If the table still looks wrong, keep the setIsLoading(false) here 
+      // as a safety mechanism, but be aware of the race condition.
+      // setIsLoading(false); 
     }
   };
   const handleLeaveTable = async () => {
@@ -674,6 +692,138 @@ useEffect(() => {
                       }}
                     />
 
+                    {/* =========== ENHANCED PLAYER SEATS WITH INTEGRATED CARDS =========== */}
+                    {table.players.map((player) => {
+                      const { x, y } = getPlayerPosition(player.position, table.maxPlayers);
+                      const isMyPlayer = String(player.id) === String(user?.id);
+                      const isActive = String(table.currentPlayer) === String(player.id);
+                      const avatarUrl = player.avatar_url || null;
+                      const hasCards = animationComplete && player.cards && player.cards.length > 0 && 
+                                      !(player as any).isFolded && !(player as any).isSittingOut;
+
+                      return (
+                        <div
+                          key={player.id}
+                          style={{ 
+                            left: `${x}%`, 
+                            top: `${y}%`,
+                          }}
+                          className="absolute transform -translate-x-1/2 -translate-y-1/2 z-20"
+                        >
+                          <div 
+                            className={`flex flex-col items-center p-4 rounded-xl bg-gray-800 shadow-2xl 
+                                        border-2 transition-all duration-300 ${
+                                          isActive ? 'border-green-400 scale-105 shadow-green-400/50' : 'border-gray-700'
+                                        } ${
+                                          hasCards ? 'w-80' : 'w-44'
+                                        }`}
+                          >
+                            <div className="flex items-center gap-1 w-full">
+                              {/* Avatar - LARGER (16 -> 20) */}
+                              <div className="relative flex-shrink-0">
+                                {avatarUrl ? (
+                                  <img 
+                                    src={avatarUrl}
+                                    alt={`${player.username}'s profile`} 
+                                    className="w-20 h-20 rounded-full object-cover border-3 border-white shadow-lg" 
+                                  />
+                                ) : (
+                                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-poker-gold to-yellow-600 flex items-center justify-center border-3 border-white shadow-lg">
+                                    <span className="text-gray-900 font-bold text-2xl">
+                                      {player.username.charAt(0).toUpperCase()}
+                                    </span>
+                                  </div>
+                                )}
+                                
+                                {/* Dealer/Blind Button */}
+                                {(player.isDealer || player.isBigBlind || player.isSmallBlind) && (
+                                  <div 
+                                    className={`absolute -bottom-1 -right-1 w-7 h-7 rounded-full text-sm font-bold flex items-center justify-center text-gray-900 shadow-md ${
+                                      player.isDealer ? 'bg-white' : (player.isBigBlind ? 'bg-red-500' : 'bg-blue-500')
+                                    }`}
+                                    title={player.isDealer ? 'Dealer' : (player.isBigBlind ? 'Big Blind' : 'Small Blind')}
+                                  >
+                                    {player.isDealer ? 'D' : (player.isBigBlind ? 'BB' : 'SB')}
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Name and Stack */}
+                              <div className="flex-1 min-w-[100px]">
+                                <div className={`text-base font-bold ${isMyPlayer ? 'text-poker-gold' : 'text-white'}`}>
+                                  {player.username}
+                                </div>
+                                <div className="text-sm text-gray-300 font-semibold">
+                                  {formatCurrency(player.chips)}
+                                </div>
+                              </div>
+                              
+                              {/* Cards - LARGER (12x16 -> 16x22) and V-SHAPED */}
+                              {hasCards && player.cards && (
+                                  <div className="flex flex-shrink-0 items-center relative" style={{ width: '100px' }}>
+                                  {isMyPlayer ? (
+                                    // V-shaped cards for current user - OVERLAPPING
+                                    player.cards.map((card, index) => (
+                                      <div 
+                                        key={`card-${index}`} 
+                                        className="w-20 h-28 transition-transform hover:scale-110 hover:z-10 absolute"
+                                        style={{
+                                          left: index === 0 ? '0px' : '50px',
+                                          top: '50%',
+                                          transform: index === 0 ? 'translateY(-50%) rotate(-10deg)' : 'translateY(-50%) rotate(10deg)',
+                                          transformOrigin: 'center center',
+                                          zIndex: index === 1 ? 2 : 1
+                                        }}
+                                      >
+                                        <img
+                                          src={`/cards/${card}.svg`}
+                                          alt={card}
+                                          className="w-full h-full object-contain rounded-lg shadow-xl"
+                                          onError={(e) => {
+                                            console.log('Card failed to load:', card);
+                                            e.currentTarget.src = '/cards/card_back.png';
+                                          }}
+                                        />
+                                      </div>
+                                    ))
+                                  ) : (
+                                    // V-shaped face-down cards for other players
+                                    Array.from({ length: 2 }).map((_, index) => (
+                                      <div 
+                                        key={`card-back-${index}`} 
+                                        className="w-20 h-28 transition-transform hover:scale-110 hover:z-10 absolute"
+                                        style={{
+                                          left: index === 0 ? '0px' : '50px',
+                                          top: '50%',
+                                          transform: index === 0 ? 'translateY(-50%) rotate(-10deg)' : 'translateY(-50%) rotate(10deg)',
+                                          transformOrigin: 'center center',
+                                          zIndex: index === 1 ? 2 : 1
+                                        }}
+                                      >
+                                        <img
+                                          src="/cards/card_back.png"
+                                          alt="face-down card"
+                                          className="w-full h-full object-contain rounded-lg shadow-xl"
+                                        />
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Current Bet Badge */}
+                            {(player.currentBet ?? 0) > 0 && (
+                              <div className="absolute -top-9 bg-gradient-to-r from-yellow-600 to-yellow-500 text-gray-900 px-3 py-1 rounded-full text-sm font-bold shadow-lg">
+                                {formatCurrency(player.currentBet ?? 0)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {/* ========= END ENHANCED PLAYER SEATS ========= */}
+
                     {/* Community Cards Area */}
                     <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
                       <div className="text-center mb-2">
@@ -709,111 +859,40 @@ useEffect(() => {
                       </div>
                     </div>
 
-                    {/* Players positioned around table */}
-                    {table.players.map((player) => {
-                      const { x, y } = getPlayerPosition(player.position, table.maxPlayers);
-                      const isCurrentUser = player.id === user?.id;
-                      
-                      return (
-                        <div
-                          key={player.id}
-                          className="absolute z-20"
-                          style={{ 
-                            left: `${x}%`, 
-                            top: `${y}%`,
-                            transform: 'translate(-50%, -50%)'
-                          }}
-                        >
-                          <div className="relative">
-                            {/* Border container - positioned so avatar stays at origin */}
-                            {isCurrentUser && animationComplete && player.cards && player.cards.length > 0 && (
-                              <div 
-                                className={`absolute top-1/2 -translate-y-1/2 bg-gray-800 bg-opacity-50 ring-2 ring-poker-gold rounded-2xl p-[15px] pointer-events-none ${
-                                  player.position >= 5 ? 'right-0' : 'left-0'
-                                }`}
-                              >
-                                {/* Invisible placeholder to define border size */}
-                                <div className={`flex items-center gap-1 opacity-0 ${
-                                  player.position >= 5 ? 'flex-row-reverse' : ''
-                                }`}>
-                                  <div className="w-16 h-28"></div>
-                                  <div className="flex gap-1">
-                                    {player.cards.map((_, index) => (
-                                      <div key={`placeholder-${index}`} className="w-12 h-16"></div>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Avatar - always in the same position, higher z-index */}
-                            <div className="text-center relative z-10 ml-1">
-                              <div className={`w-16 h-16 rounded-full border-4 ${
-                                player.isDealer ? 'border-poker-gold shadow-lg shadow-yellow-500/50' :
-                                player.isSmallBlind ? 'border-blue-400 shadow-lg shadow-blue-400/50' :
-                                player.isBigBlind ? 'border-red-400 shadow-lg shadow-red-400/50' :
-                                'border-gray-600'
-                              } bg-gradient-to-br from-poker-gold to-yellow-600 flex items-center justify-center mx-auto mb-2`}>
-                                <span className="text-gray-900 font-bold text-lg">
-                                  {player.username.charAt(0).toUpperCase()}
-                                </span>
-                              </div>
-                              
-                              <div className="text-white font-semibold text-sm mb-1 drop-shadow-md">
-                                {player.username}
-                                {isCurrentUser && <span className="text-poker-gold ml-1">(You)</span>}
-                              </div>
-                              
-                              <div className="text-poker-gold font-bold text-sm drop-shadow-md">
-                                {formatCurrency(player.chips)}
-                              </div>
-                              
-                              <div className="text-xs mt-1 space-x-1">
-                                {player.isDealer && <span className="text-poker-gold bg-yellow-900 px-1 rounded">D</span>}
-                                {player.isSmallBlind && <span className="text-blue-400 bg-blue-900 px-1 rounded">SB</span>}
-                                {player.isBigBlind && <span className="text-red-400 bg-red-900 px-1 rounded">BB</span>}
-                              </div>
-                            </div>
-                            
-                            {/* Cards for current user - positioned to the right, higher z-index */}
-                            {animationComplete && isCurrentUser && player.cards && player.cards.length > 0 && (
-                              <div className="absolute left-full top-1/2 -translate-y-1/2 flex gap-1 ml-2 z-10">
-                                {player.cards.map((card, index) => (
-                                  <div key={`static-user-${index}`} className="w-12 h-16 flex-shrink-0">
-                                    <img
-                                      src={`/cards/${card}.svg`}
-                                      alt={card}
-                                      className="w-full h-full object-contain rounded shadow-lg"
-                                      onError={(e) => {
-                                        console.log('Card failed to load:', card);
-                                        e.currentTarget.src = '/cards/card_back.png';
-                                      }}
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            
-                            {/* Cards for other players - positioned to the right */}
-                            {animationComplete && !isCurrentUser && player.cards && player.cards.length > 0 && 
-                              !(player as any).isFolded && 
-                              !(player as any).isSittingOut && (
-                              <div className="absolute left-full top-1/2 -translate-y-1/2 flex gap-1 ml-3">
-                                {Array.from({ length: 2 }).map((_, index) => (
-                                  <div key={`static-opp-${index}`} className="w-12 h-16 flex-shrink-0">
-                                    <img
-                                      src="/cards/card_back.png"
-                                      alt="face-down card"
-                                      className="w-full h-full object-contain rounded shadow-lg"
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                    {/* Community Cards Area */}
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
+                      <div className="text-center mb-2">
+                        {table.currentPot > 0 && (
+                          <div className="text-poker-gold font-bold text-xl mb-1 drop-shadow-lg">
+                            Pot: {formatCurrency(table.currentPot)}
                           </div>
+                        )}
+                        <div className="text-white font-semibold text-sm capitalize drop-shadow-md">
+                          {table.gamePhase}
                         </div>
-                      );
-                    })}
+                      </div>
+                      
+                      {/* Community Cards */}
+                      <div className="flex justify-center space-x-2">
+                        {table.communityCards && table.communityCards.length > 0 ? (
+                          table.communityCards.map((card, index) => (
+                            <img
+                              key={index}
+                              src={`/cards/${card}.svg`}
+                              alt={card}
+                              className="w-12 h-16 rounded border-2 border-gray-300 shadow-lg"
+                            />
+                          ))
+                        ) : null}
+
+                        {Array.from({ length: 5 - (table.communityCards?.length || 0) }).map((_, index) => (
+                          <div
+                            key={`placeholder-${index}`}
+                            className="w-12 h-16 bg-gray-600 rounded border-2 border-gray-500 opacity-30"
+                          />
+                        ))}
+                      </div>
+                    </div>
 
                     {/* Animated hole cards - positioned exactly where static cards would be */}
                     {!animationComplete && animatedCards.map(({ playerId, card, index }, animIndex) => {
@@ -822,20 +901,18 @@ useEffect(() => {
                       
                       const { x, y, offsetX } = getCardPosition(player.position, index, table.maxPlayers);
                       const isCurrentUser = player.id === user?.id;
-                      
-                      // Show face-up cards for current user, face-down for others
                       const cardSrc = isCurrentUser && card !== 'card_back' ? `/cards/${card}.svg` : '/cards/card_back.png';
 
                       return (
                         <motion.div
                           key={`${playerId}-${index}-${animIndex}`}
-                          className="absolute w-12 h-16 pointer-events-none z-30"
+                          className="absolute w-16 h-22 pointer-events-none z-30"
                           initial={{ 
                             left: `${deckPosition.x}%`, 
                             top: `${deckPosition.y}%`,
                             x: '-50%',
                             y: '-50%',
-                            scale: 0.9,
+                            scale: 0.8,
                             rotate: Math.random() * 10 - 5,
                             zIndex: 100 + animIndex
                           }}
@@ -859,7 +936,7 @@ useEffect(() => {
                           <img
                             src={cardSrc}
                             alt={isCurrentUser && card !== 'card_back' ? card : 'face-down card'}
-                            className="w-full h-full object-contain rounded shadow-lg"
+                            className="w-full h-full object-contain rounded-lg shadow-xl"
                             onError={(e) => {
                               console.log('Animated card failed to load:', cardSrc);
                               e.currentTarget.src = '/cards/card_back.png';

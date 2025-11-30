@@ -1,6 +1,7 @@
 // server/controllers/tableController.js - WITH DEBUG LOGGING
 console.log('🔧 DEBUG: Loading tableController.js');
 const TableService = require('../services/tableService');
+const User = require('../models/User');
 
 console.log('🔧 DEBUG: TableService loaded:', typeof TableService);
 console.log('🔧 DEBUG: TableService.getActiveTables:', typeof TableService.getActiveTables);
@@ -243,10 +244,20 @@ class TableController {
         userId: req.user.userId 
       });
       
+      // ✅ Fetch full user data from database
+      const fullUser = await User.findById(req.user.userId);
+      
+      if (!fullUser) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found'
+        });
+      }
+      
       const success = TableService.joinAsSpectator(tableId, {
-        id: req.user.userId,
+        userId: req.user.userId,
         username: req.user.username,
-        avatar_url: req.user.avatar_url
+        avatar_url: fullUser.avatar_url || null
       });
       
       if (!success) {
@@ -295,12 +306,22 @@ class TableController {
         });
       }
       
-      const result = TableService.joinAsPlayer(
+      // ✅ Fetch full user data from database
+      const fullUser = await User.findById(req.user.userId);
+      
+      if (!fullUser) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found'
+        });
+      }
+      
+      const result = await TableService.joinAsPlayer(
         tableId, 
         {
-          id: req.user.userId.toString(),
+          userId: req.user.userId,
           username: req.user.username,
-          avatar_url: req.user.avatar_url
+          avatar_url: fullUser.avatar_url || null
         },
         buyInAmount
       );

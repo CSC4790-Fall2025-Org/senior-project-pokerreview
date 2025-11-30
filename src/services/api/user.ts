@@ -8,7 +8,7 @@ export interface UserProfile {
   id: number;
   username: string;
   email: string;
-  avatar_url?: string;
+  avatar_url?: string; // This is the property that was causing the issue if not present
   games_played: number;
   hands_played: number;
   hands_won: number;
@@ -148,6 +148,43 @@ export class UserService {
       }
     } catch (error) {
       console.error('Get recent games error:', error);
+      return { success: false, error: 'Network error. Please try again.' };
+    }
+  }
+  
+  // ===============================================
+  // NEW METHOD: UPLOAD AVATAR
+  // ===============================================
+  static async uploadAvatar(file: File): Promise<UserResponse> {
+    try {
+      const token = AuthService.getToken();
+      if (!token) {
+        return { success: false, error: 'No authentication token' };
+      }
+
+      const formData = new FormData();
+      // 'avatar' must match the field name used in the multer setup on the server
+      formData.append('avatar', file); 
+
+      const response = await fetch(`${API_BASE_URL}/api/users/profile/avatar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          // IMPORTANT: Do NOT set 'Content-Type': 'multipart/form-data'. 
+          // The browser handles this automatically and correctly for FormData.
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        return data;
+      } else {
+        return { success: false, error: data.error || 'Failed to upload avatar' };
+      }
+    } catch (error) {
+      console.error('Upload avatar error:', error);
       return { success: false, error: 'Network error. Please try again.' };
     }
   }

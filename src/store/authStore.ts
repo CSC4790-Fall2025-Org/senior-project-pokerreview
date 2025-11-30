@@ -8,6 +8,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: false,
   error: null,
 
+  updateUser: (newUserData) => {
+    set((state) => ({
+      user: state.user 
+        ? { ...state.user, ...newUserData } 
+        : null,
+    }));
+  },
+
   login: async (credentials: LoginCredentials) => {
     set({ isLoading: true, error: null });
     

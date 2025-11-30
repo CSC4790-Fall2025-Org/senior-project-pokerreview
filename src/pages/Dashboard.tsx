@@ -1,16 +1,52 @@
-// src/pages/Dashboard.tsx - IMPROVED VERSION
+// src/pages/Dashboard.tsx - FINAL CORRECTED VERSION
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { TableService, TableData } from '../services/api/table';
+import { StatsService } from '../services/api/stats'; 
 import { Button } from '../components/common/Button';
-import { StatsService, UserStats } from '../services/api/stats';
+
+// ----------------------------------------------------------------------
+// LOCAL INTERFACE DEFINITIONS TO RESOLVE TYPESCRIPT ERRORS
+// ----------------------------------------------------------------------
+
+// Extending the expected TablePlayer interface to include avatar_url for the fix
+interface PlayerWithAvatar {
+  id: string;
+  username: string;
+  chips: number;
+  // REMOVE stack: number;
+  position: number;
+  avatar_url?: string | null;
+  isDealer: boolean;
+  isSmallBlind: boolean;
+  isBigBlind: boolean;
+}
+
+// Extending the expected TableData interface from the API to use the fixed player type
+interface DashboardTableData extends TableData {
+  players: PlayerWithAvatar[];
+}
+
+// Assuming UserStats structure based on usage
+interface UserStats {
+  totalWinnings: number;
+  handsPlayed: number;
+  gamesPlayed: number;
+  winRate: number;
+  handsWon: number;
+  biggestPot: number;
+}
+// ----------------------------------------------------------------------
+// END INTERFACE DEFINITIONS
+// ----------------------------------------------------------------------
+
 
 export const Dashboard: React.FC = () => {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [tables, setTables] = useState<TableData[]>([]);
+  const [tables, setTables] = useState<DashboardTableData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -58,14 +94,15 @@ export const Dashboard: React.FC = () => {
     try {
       const response = await TableService.getTables();
       if (response.success && response.tables) {
-        const transformedTables: TableData[] = response.tables.map(table => ({
+        // We cast the incoming data to our extended type for safety
+        const transformedTables: DashboardTableData[] = response.tables.map(table => ({
           ...table,
           currentPlayers: table.currentPlayers ?? table.players.length,
           spectators: table.spectators ?? 0,
           spectatorList: table.spectatorList ?? [],
           communityCards: table.communityCards ?? [],
           userRole: table.userRole ?? 'none'
-        }));
+        })) as DashboardTableData[]; 
         setTables(transformedTables);
         setError(null);
       } else {
@@ -171,10 +208,18 @@ export const Dashboard: React.FC = () => {
               onClick={() => setIsProfileOpen(!isProfileOpen)}
               className="flex items-center space-x-3 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg border border-gray-700 hover:border-poker-gold transition-all"
             >
-              <div className="w-10 h-10 bg-gradient-to-br from-poker-gold to-yellow-600 rounded-full flex items-center justify-center">
-                <span className="text-gray-900 font-semibold text-lg">
-                  {user?.username.charAt(0).toUpperCase()}
-                </span>
+              <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-poker-gold to-yellow-600 flex items-center justify-center">
+                {user?.avatar_url ? (
+                  <img 
+                    src={user.avatar_url}  
+                    alt={`${user.username} avatar`} 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-gray-900 font-semibold text-lg">
+                    {user?.username.charAt(0).toUpperCase()}
+                  </span>
+                )}
               </div>
               <span className="hidden md:block font-medium text-white">{user?.username}</span>
               <svg 
@@ -456,12 +501,22 @@ export const Dashboard: React.FC = () => {
                               {table.players.slice(0, 5).map((player) => (
                                 <div
                                   key={player.id}
-                                  className="w-10 h-10 rounded-full border-2 border-gray-700 hover:border-poker-gold hover:z-10 transition-all bg-gradient-to-br from-poker-gold to-yellow-600 flex items-center justify-center cursor-pointer"
-                                  title={`${player.username} - ${formatCurrency(player.chips)}`}
+                                  className="w-10 h-10 rounded-full border-2 border-gray-700 hover:border-poker-gold hover:z-10 transition-all overflow-hidden bg-gradient-to-br from-poker-gold to-yellow-600 flex items-center justify-center cursor-pointer"
+                                  // FIX: Use player.chips ?? 0 to resolve 'number | undefined' error
+                                  title={`${player.username} - ${formatCurrency(player.chips ?? 0)}`}
                                 >
-                                  <span className="text-gray-900 font-bold text-sm">
-                                    {player.username.charAt(0).toUpperCase()}
-                                  </span>
+                                  {/* FIX: Check for avatar_url and use /uploads/ prefix */}
+                                  {player.avatar_url ? (
+                                    <img
+                                      src={player.avatar_url} 
+                                      alt={`${player.username} avatar`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <span className="text-gray-900 font-bold text-sm">
+                                      {player.username.charAt(0).toUpperCase()}
+                                    </span>
+                                  )}
                                 </div>
                               ))}
                               {table.players.length > 5 && (
