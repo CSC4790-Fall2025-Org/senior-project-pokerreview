@@ -3,6 +3,10 @@ export interface User {
   email: string;
   username: string;
   createdAt: string;
+  bankroll?: number;
+  gamesPlayed?: number;
+  gamesWon?: number;
+  biggestWin?: number;
 }
 
 export interface LoginCredentials {

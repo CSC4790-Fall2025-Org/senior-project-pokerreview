@@ -2,6 +2,8 @@
 
 A full-stack poker application featuring real-time multiplayer gameplay and an AI-powered poker coach that analyzes your hands and provides strategic insights.
 
+Check out our deployed website at https://pokerreview.ddnsfree.com/ 
+
 ![Poker Platform](./docs/screenshot.png)
 
 ## ✨ Features

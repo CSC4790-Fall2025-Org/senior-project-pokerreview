@@ -21,3 +21,85 @@
     @apply w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-poker-gold focus:ring-1 focus:ring-poker-gold;
   }
 }
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes float-delayed {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+@keyframes bounce-slow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float-delayed 3.5s ease-in-out infinite;
+}
+
+.animate-float-delayed-2 {
+  animation: float-delayed 4s ease-in-out infinite;
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 2s ease-in-out infinite;
+}
+
+.delay-300 {
+  animation-delay: 0.3s;
+}
+
+.delay-500 {
+  animation-delay: 0.5s;
+}
+
+/*
+ * Custom Scrollbar Styles
+ * Apply to the elements that are set to overflow-y-auto or overflow-x-auto
+ */
+.scrollbar-thin-dark::-webkit-scrollbar {
+  width: 8px; /* For vertical scrollbars */
+  height: 8px; /* For horizontal scrollbars */
+}
+
+.scrollbar-thin-dark::-webkit-scrollbar-track {
+  background: #1f2937; /* Dark background track (gray-800 equivalent) */
+  border-radius: 10px;
+}
+
+.scrollbar-thin-dark::-webkit-scrollbar-thumb {
+  background-color: #4b5563; /* Medium dark thumb (gray-600 equivalent) */
+  border-radius: 10px;
+  border: 2px solid #1f2937; /* Padding around the thumb */
+}
+
+.scrollbar-thin-dark::-webkit-scrollbar-thumb:hover {
+  background-color: #6b7280; /* Lighter hover color (gray-500 equivalent) */
+}
+
+/* Optional: Fallback for Firefox */
+/* You may need to enable scrollbar-width and scrollbar-color utilities in your tailwind.config.js */
+.scrollbar-thin-dark {
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 #1f2937;
+}

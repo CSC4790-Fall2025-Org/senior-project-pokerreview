@@ -1,10 +1,21 @@
+// src/pages/Profile.tsx - REDESIGNED VERSION
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { UserService, UserProfile } from '../services/api/user';
+import { TableService } from '../services/api/table'; // Import TableService to mock Hand History API call
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { HandHistory } from '../components/common/HandHistory';
+
+// Mock HandHistory type for the preview section
+interface RecentHand {
+  id: string;
+  table_name: string;
+  time: string;
+  result_text: string;
+  profit: number;
+}
 
 export const Profile: React.FC = () => {
   const { user, logout } = useAuthStore();
@@ -14,31 +25,60 @@ export const Profile: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [showHandHistory, setShowHandHistory] = useState(false);
+  const [selectedHandInModal, setSelectedHandInModal] = useState<any>(null); // State to pass a specific hand to the modal
+  const [recentHands, setRecentHands] = useState<RecentHand[]>([]);
+  
   const [formData, setFormData] = useState({
     username: user?.username || '',
     email: user?.email || '',
   });
 
-  // Load user profile with stats on component mount
+  // Load user profile and recent hands on component mount
   useEffect(() => {
-    const loadProfile = async () => {
+    const loadData = async () => {
       setIsLoading(true);
-      const response = await UserService.getProfile();
-      if (response.success && response.user) {
-        setUserProfile(response.user);
+      
+      // 1. Load Profile
+      const profileResponse = await UserService.getProfile();
+      if (profileResponse.success && profileResponse.user) {
+        setUserProfile(profileResponse.user);
         setFormData({
-          username: response.user.username,
-          email: response.user.email,
+          username: profileResponse.user.username,
+          email: profileResponse.user.email,
         });
       } else {
-        setError(response.error || 'Failed to load profile');
+        setError(profileResponse.error || 'Failed to load profile');
       }
+
+      // 2. Load Recent Hands (Mocked API call for structure)
+      try {
+        const handsResponse = await UserService.getUserHandHistory(10); // Load top 10 for preview
+        if (handsResponse.success && handsResponse.hands) {
+          const handsData: RecentHand[] = handsResponse.hands.map((hand: any) => {
+            const playerResult = hand.all_players?.find((p: any) => p.username === user?.username);
+            const profit = playerResult?.profit || 0;
+            const tableIdPart = hand.table_id?.split('-').slice(0, -1).join(' ');
+            return {
+              id: hand.hand_id || hand.id,
+              table_name: tableIdPart || 'Unknown Table',
+              time: new Date(hand.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              profit: profit,
+              rawHandData: hand, // Store raw data to pass to modal
+              result_text: profit > 0 ? 'Win' : profit < 0 ? 'Loss' : 'Chop',
+            };
+          });
+          setRecentHands(handsData);
+        }
+      } catch (err) {
+        console.error('Error loading recent hands:', err);
+      }
+
       setIsLoading(false);
     };
 
-    loadProfile();
-  }, []);
-
+    loadData();
+  }, [user?.username]);
+  
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
       ...prev,
@@ -75,9 +115,27 @@ export const Profile: React.FC = () => {
     setIsEditing(false);
     setError(null);
   };
+  
+  const handleOpenHandHistory = (hand: any | null = null) => {
+    if (hand) {
+      setSelectedHandInModal(hand.rawHandData);
+    } else {
+      setSelectedHandInModal(null);
+    }
+    setShowHandHistory(true);
+  };
+  
+  const handleCloseHandHistory = () => {
+      setShowHandHistory(false);
+      setSelectedHandInModal(null);
+  };
 
-  const goBack = () => {
-    navigate('/dashboard');
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+    }).format(amount);
   };
 
   if (isLoading && !userProfile) {
@@ -89,248 +147,274 @@ export const Profile: React.FC = () => {
   }
 
   const displayUser = userProfile || user;
-
+  const winRate = userProfile?.win_rate || 0;
+  const profitColor = winRate >= 50 ? 'text-green-400' : winRate > 0 ? 'text-yellow-400' : 'text-red-400';
+  const totalWinnings = userProfile?.total_winnings || 0;
+  
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-poker-green">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       {/* Header */}
-      <header className="p-6 border-b border-gray-700">
-        <nav className="flex justify-between items-center max-w-4xl mx-auto">
+      <header className="sticky top-0 z-20 bg-gray-900 bg-opacity-70 backdrop-blur-sm p-4 border-b border-poker-gold/50 shadow-lg">
+        <nav className="flex justify-between items-center max-w-7xl mx-auto">
           <button
-            onClick={goBack}
-            className="flex items-center text-gray-400 hover:text-white transition-colors"
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center text-gray-400 hover:text-poker-gold transition-colors font-medium"
           >
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back to Dashboard
+            Dashboard
           </button>
-          <div className="text-2xl font-bold text-poker-gold">
-            Poker Review
+          <div className="text-2xl font-bold bg-gradient-to-r from-poker-gold to-yellow-400 bg-clip-text text-transparent">
+            {displayUser?.username}'s Profile
           </div>
-          <div></div> {/* Spacer for flex layout */}
+          <Button onClick={logout} variant="secondary" className="bg-red-600 hover:bg-red-700 text-white text-sm">
+            Sign Out
+          </Button>
         </nav>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-6 py-8">
-        <div className="bg-gray-800 rounded-lg p-8 border border-gray-700">
-          {/* Profile Header */}
-          <div className="flex items-center mb-8">
-            <div className="w-20 h-20 bg-poker-gold rounded-full flex items-center justify-center mr-6">
-              <span className="text-gray-900 font-bold text-2xl">
-                {displayUser?.username.charAt(0).toUpperCase()}
-              </span>
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">{displayUser?.username}</h1>
-              <p className="text-gray-400">Member since {new Date((userProfile?.created_at || user?.createdAt) || '').toLocaleDateString()}</p>
-            </div>
-          </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-900 border border-red-700 text-red-100 px-4 py-3 rounded mb-6">
-              {error}
-            </div>
-          )}
-
-          {/* Profile Information */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Personal Information */}
-            <div>
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-white">Personal Information</h2>
-                {!isEditing && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => setIsEditing(true)}
-                    className="text-sm px-4 py-2"
-                  >
-                    Edit Profile
-                  </Button>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                <Input
-                  label="Username"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                />
-                
-                <Input
-                  label="Email"
-                  name="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                />
-
-                {isEditing && (
-                  <div className="flex space-x-4 pt-4">
-                    <Button 
-                      onClick={handleSave} 
-                      className="flex-1"
-                      isLoading={isLoading}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? 'Saving...' : 'Save Changes'}
-                    </Button>
-                    <Button 
-                      onClick={handleCancel} 
-                      variant="secondary" 
-                      className="flex-1"
-                      disabled={isLoading}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Game Statistics */}
-            <div>
-              <h2 className="text-xl font-semibold text-white mb-6">Game Statistics</h2>
-              
-              {/* Main Stats Grid */}
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                {/* Total Games - Large Card */}
-                <div className="col-span-2 bg-gradient-to-br from-poker-gold to-yellow-600 rounded-xl p-6 shadow-lg">
-                  <div className="text-gray-900 text-sm font-medium mb-1">Total Games Played</div>
-                  <div className="text-gray-900 text-5xl font-bold">{userProfile?.games_played || 0}</div>
+      {/* Main Content: Increased max-width to 7xl */}
+      <main className="max-w-7xl mx-auto px-6 py-10">
+        <div className="space-y-10">
+          
+          {/* Section 1: User Info and Editing */}
+          <div className="bg-gray-800 rounded-xl p-8 border border-gray-700 shadow-2xl">
+            <div className="flex items-start justify-between mb-8">
+              <div className="flex items-center">
+                <div className="w-24 h-24 bg-gradient-to-br from-poker-gold to-yellow-600 rounded-full flex items-center justify-center mr-6 shadow-xl">
+                  <span className="text-gray-900 font-extrabold text-4xl">
+                    {displayUser?.username.charAt(0).toUpperCase()}
+                  </span>
                 </div>
-                
-                {/* Win Rate - Circular Progress */}
-                <div className="bg-gray-900 rounded-xl p-6 shadow-lg flex flex-col items-center justify-center">
-                  <div className="relative w-32 h-32 mb-3">
-                    <svg className="transform -rotate-90 w-32 h-32">
-                      <circle
-                        cx="64"
-                        cy="64"
-                        r="56"
-                        stroke="currentColor"
-                        strokeWidth="8"
-                        fill="transparent"
-                        className="text-gray-700"
-                      />
-                      <circle
-                        cx="64"
-                        cy="64"
-                        r="56"
-                        stroke="currentColor"
-                        strokeWidth="8"
-                        fill="transparent"
-                        strokeDasharray={`${2 * Math.PI * 56}`}
-                        strokeDashoffset={`${2 * Math.PI * 56 * (1 - (userProfile?.win_rate || 0) / 100)}`}
-                        className="text-green-400"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-3xl font-bold text-white">{userProfile?.win_rate || 0}%</span>
+                <div>
+                  <h1 className="text-4xl font-extrabold text-white">{displayUser?.username}</h1>
+                  <p className="text-gray-400 mt-1">
+                    Member since {new Date((userProfile?.created_at || user?.createdAt) || '').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  </p>
+                </div>
+              </div>
+              
+              {!isEditing && (
+                <Button
+                  variant="secondary"
+                  onClick={() => setIsEditing(true)}
+                  className="text-base px-6 py-2 border-poker-gold/50 hover:bg-gray-700"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                  Edit Profile
+                </Button>
+              )}
+            </div>
+            
+            {/* Editing Form */}
+            {isEditing ? (
+                <div className="pt-6 border-t border-gray-700">
+                    <h2 className="text-2xl font-semibold text-white mb-4">Update Details</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Input
+                            label="Username"
+                            name="username"
+                            value={formData.username}
+                            onChange={handleChange}
+                        />
+                        <Input
+                            label="Email"
+                            name="email"
+                            type="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                        />
                     </div>
-                  </div>
-                  <div className="text-gray-400 text-sm font-medium">Win Rate</div>
+                    <div className="flex space-x-4 pt-6">
+                        <Button 
+                            onClick={handleSave} 
+                            className="flex-1 max-w-xs"
+                            isLoading={isLoading}
+                            disabled={isLoading}
+                        >
+                            {isLoading ? 'Saving...' : 'Save Changes'}
+                        </Button>
+                        <Button 
+                            onClick={handleCancel} 
+                            variant="secondary" 
+                            className="flex-1 max-w-xs"
+                            disabled={isLoading}
+                        >
+                            Cancel
+                        </Button>
+                    </div>
                 </div>
-                
-                {/* Total Winnings */}
-                <div className="bg-gray-900 rounded-xl p-6 shadow-lg flex flex-col justify-center">
-                  <div className="text-gray-400 text-sm font-medium mb-2">Total Winnings</div>
-                  <div className="text-green-400 text-3xl font-bold">
-                    ${(userProfile?.total_winnings || 0).toLocaleString()}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-2">
-                    Avg: ${(userProfile?.avg_pot_won || 0).toLocaleString()} per pot
-                  </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-gray-700 text-lg">
+                    <div>
+                        <p className="text-gray-400">Email:</p>
+                        <p className="text-white font-medium">{displayUser?.email}</p>
+                    </div>
+                    <div>
+                        <p className="text-gray-400">Total Games:</p>
+                        <p className="text-white font-medium">{userProfile?.games_played || 0}</p>
+                    </div>
+                </div>
+            )}
+            
+            {/* Error Message */}
+            {error && (
+              <div className="bg-red-900 border border-red-700 text-red-100 px-4 py-3 rounded mt-6">
+                {error}
+              </div>
+            )}
+          </div>
+          
+          {/* Section 2: Game Statistics - Enhanced Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* Card 1: Total Winnings */}
+            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg col-span-1">
+              <div className="text-gray-400 text-lg font-semibold mb-2 flex items-center">
+                <span className="mr-2 text-yellow-500">🏆</span> Total Net Winnings
+              </div>
+              <div className={`text-4xl font-extrabold ${totalWinnings >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {formatCurrency(totalWinnings)}
+              </div>
+              <p className="text-gray-500 text-sm mt-1">Overall profit/loss across all hands.</p>
+            </div>
+            
+            {/* Card 2: Win Rate */}
+            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg flex items-center justify-between">
+              <div>
+                <div className="text-gray-400 text-lg font-semibold mb-1 flex items-center">
+                  <span className="mr-2 text-blue-500">📈</span> Win Rate
+                </div>
+                <div className={`text-5xl font-extrabold ${profitColor}`}>
+                  {winRate}%
                 </div>
               </div>
-              
-              {/* Secondary Stats */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-gray-900 rounded-lg p-4 border-l-4 border-blue-500">
-                  <div className="text-gray-400 text-xs mb-1">Hands Played</div>
-                  <div className="text-white text-2xl font-bold">{userProfile?.hands_played || 0}</div>
-                </div>
-                
-                <div className="bg-gray-900 rounded-lg p-4 border-l-4 border-green-500">
-                  <div className="text-gray-400 text-xs mb-1">Hands Won</div>
-                  <div className="text-white text-2xl font-bold">{userProfile?.hands_won || 0}</div>
-                </div>
-                
-                <div className="bg-gray-900 rounded-lg p-4 border-l-4 border-purple-500">
-                  <div className="text-gray-400 text-xs mb-1">Win/Hand</div>
-                  <div className="text-white text-2xl font-bold">
-                    {userProfile?.hands_played ? 
-                      `${((userProfile.hands_won / userProfile.hands_played) * 100).toFixed(1)}%` : 
-                      '0%'
-                    }
-                  </div>
-                </div>
+              <div className="relative w-20 h-20">
+                <svg className="transform -rotate-90 w-20 h-20">
+                  <circle
+                    cx="40"
+                    cy="40"
+                    r="36"
+                    stroke="currentColor"
+                    strokeWidth="5"
+                    fill="transparent"
+                    className="text-gray-700"
+                  />
+                  <circle
+                    cx="40"
+                    cy="40"
+                    r="36"
+                    stroke="currentColor"
+                    strokeWidth="5"
+                    fill="transparent"
+                    strokeDasharray={`${2 * Math.PI * 36}`}
+                    strokeDashoffset={`${2 * Math.PI * 36 * (1 - winRate / 100)}`}
+                    className={`${winRate >= 50 ? 'text-green-400' : 'text-yellow-400'}`}
+                    strokeLinecap="round"
+                  />
+                </svg>
               </div>
+            </div>
+            
+            {/* Card 3: Hands Played */}
+            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
+              <div className="text-gray-400 text-lg font-semibold mb-2 flex items-center">
+                <span className="mr-2 text-poker-gold">♠️</span> Hands Played
+              </div>
+              <div className="text-4xl font-extrabold text-white">
+                {userProfile?.hands_played || 0}
+              </div>
+              <p className="text-gray-500 text-sm mt-1">Total hands recorded in history.</p>
             </div>
           </div>
 
-          {/* Hand History Section */}
-          <div className="mt-12">
+          {/* Section 3: Detailed Hand History Preview (New Feature) */}
+          <div className="pt-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-white">Hand History</h2>
+              <h2 className="text-2xl font-bold text-white flex items-center">
+                <span className="mr-3 text-red-500">♦️</span> Recent Hand History
+              </h2>
               <Button
-                onClick={() => setShowHandHistory(true)}
+                onClick={() => handleOpenHandHistory()}
                 variant="secondary"
+                className="text-sm px-4 py-2 hover:bg-poker-gold/20"
               >
                 View All Hands
               </Button>
             </div>
-            <div className="bg-gray-900 rounded-lg p-6">
-              <p className="text-gray-400">
-                {userProfile?.hands_played ? 
-                  `You've played ${userProfile.hands_played} hands across all tables` :
-                  'No hands played yet. Join a game to start playing!'
-                }
-              </p>
-            </div>
+            
+            {/* Scrollable Hand History Cards */}
+            {recentHands.length === 0 ? (
+                <div className="bg-gray-800 rounded-xl p-8 text-center border border-gray-700">
+                    <p className="text-gray-400 text-lg">
+                        No recent hands to display. Play a game to start tracking!
+                    </p>
+                </div>
+            ) : (
+                <div className="flex overflow-x-auto space-x-4 pb-4 snap-x snap-mandatory scrollbar-thin-dark">
+                    {recentHands.map((hand) => (
+                        <button
+                            key={hand.id}
+                            onClick={() => handleOpenHandHistory(hand)}
+                            className="flex-shrink-0 w-64 p-4 bg-gray-900 rounded-lg border border-gray-700 hover:border-poker-gold transition-all duration-200 shadow-md hover:shadow-xl snap-start text-left"
+                        >
+                            <div className="text-sm font-semibold text-gray-400 mb-1 flex justify-between">
+                                <span>{hand.table_name}</span>
+                                <span>{hand.time}</span>
+                            </div>
+                            <h3 className="text-xl font-bold text-white mb-2">
+                                Hand #{hand.id.slice(-4)}
+                            </h3>
+                            <div className="border-t border-gray-700 pt-2">
+                                <span className={`text-lg font-extrabold ${hand.profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    {hand.profit >= 0 ? '+' : ''}{formatCurrency(hand.profit)}
+                                </span>
+                                <span className="text-sm text-gray-400 ml-2">({hand.result_text})</span>
+                            </div>
+                            <div className="text-xs text-blue-400 mt-2">
+                                Click to view full hand analysis
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            )}
+          </div>
+          
+          {/* Section 4: Secondary Stats Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-gray-800">
+             <div className="bg-gray-900 rounded-lg p-4 border-l-4 border-blue-500 shadow-md">
+                <div className="text-gray-400 text-sm mb-1">Hands Won</div>
+                <div className="text-white text-3xl font-bold">{userProfile?.hands_won || 0}</div>
+             </div>
+             <div className="bg-gray-900 rounded-lg p-4 border-l-4 border-green-500 shadow-md">
+                <div className="text-gray-400 text-sm mb-1">Avg Pot Won</div>
+                <div className="text-white text-3xl font-bold">{formatCurrency(userProfile?.avg_pot_won || 0)}</div>
+             </div>
+             <div className="bg-gray-900 rounded-lg p-4 border-l-4 border-yellow-500 shadow-md">
+                <div className="text-gray-400 text-sm mb-1">AI Insights Count</div>
+                <div className="text-white text-3xl font-bold">--</div> {/* Placeholder */}
+             </div>
+             <div className="bg-gray-900 rounded-lg p-4 border-l-4 border-red-500 shadow-md">
+                <div className="text-gray-400 text-sm mb-1">Last Played</div>
+                <div className="text-white text-base font-bold">
+                    {userProfile?.last_played ? 
+                      new Date(userProfile.last_played).toLocaleDateString() : 
+                      'N/A'
+                    }
+                </div>
+             </div>
           </div>
 
-          {/* Recent Activity */}
-          <div className="mt-12">
-            <h2 className="text-xl font-semibold text-white mb-6">Recent Activity</h2>
-            <div className="bg-gray-900 rounded-lg p-6">
-              {userProfile?.last_played ? (
-                <p className="text-gray-400">
-                  Last played: {new Date(userProfile.last_played).toLocaleDateString()}
-                </p>
-              ) : (
-                <p className="text-gray-400 text-center">
-                  No recent activity. Join a game to start playing!
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Account Actions */}
-          <div className="mt-12 pt-8 border-t border-gray-700">
-            <h2 className="text-xl font-semibold text-white mb-6">Account Actions</h2>
-            <div className="flex space-x-4">
-              <Button
-                onClick={logout}
-                variant="secondary"
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                Sign Out
-              </Button>
-            </div>
-          </div>
-          {/* Hand History Modal */}
-          <HandHistory
-            isOpen={showHandHistory}
-            onClose={() => setShowHandHistory(false)}
-          />
         </div>
       </main>
+      
+      {/* Hand History Modal - Passes the selected hand if clicked from the preview */}
+      <HandHistory
+        isOpen={showHandHistory}
+        onClose={handleCloseHandHistory}
+        initialSelectedHand={selectedHandInModal}
+      />
     </div>
   );
 };

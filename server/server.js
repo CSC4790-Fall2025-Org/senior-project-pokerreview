@@ -9,6 +9,7 @@ const userRoutes = require('./routes/users');
 const tableRoutes = require('./routes/tables');
 const aiRoutes = require('./routes/ai');
 
+
 if (!process.env.JWT_SECRET) {
   console.error('❌ FATAL: JWT_SECRET is not defined in environment variables!');
   process.exit(1);

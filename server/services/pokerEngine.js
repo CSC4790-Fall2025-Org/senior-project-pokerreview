@@ -700,6 +700,7 @@ class PokerGame {
       }
       
       this.nextPhase();
+      return;
     } else {
       this.nextPlayer();
     }

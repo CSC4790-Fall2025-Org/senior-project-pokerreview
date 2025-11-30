@@ -1,6 +1,7 @@
 const express = require('express');
 const UserController = require('../controllers/userController');
 const { body, validationResult } = require('express-validator');
+const User = require('../models/User');
 
 // Import auth middleware
 const { authenticateToken } = require('../middleware/auth');
@@ -53,6 +54,48 @@ router.get('/hand-history', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch hand history'
+    });
+  }
+});
+
+// Get user stats (NEW ROUTE)
+router.get('/stats', async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // Get user with stats
+    const userWithStats = await User.findByIdWithStats(userId);
+    
+    if (!userWithStats) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+    
+    // Format stats for frontend
+    const stats = {
+      bankroll: 10000, // TODO: Add bankroll to user table or calculate from total_winnings
+      gamesPlayed: parseInt(userWithStats.games_played) || 0,
+      handsPlayed: parseInt(userWithStats.hands_played) || 0,
+      handsWon: parseInt(userWithStats.hands_won) || 0,
+      totalWinnings: parseFloat(userWithStats.total_winnings) || 0,
+      winRate: parseFloat(userWithStats.win_rate) || 0,
+      avgPotWon: parseFloat(userWithStats.avg_pot_won) || 0,
+      biggestPot: parseFloat(userWithStats.biggest_pot) || 0,
+      lastPlayed: userWithStats.last_played
+    };
+    
+    res.json({
+      success: true,
+      stats
+    });
+    
+  } catch (error) {
+    console.error('Error fetching user stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch user stats'
     });
   }
 });
