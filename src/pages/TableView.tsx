@@ -1091,25 +1091,32 @@ useEffect(() => {
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
             {/* Table Info */}
-             <div className="bg-gray-800 rounded-lg border border-gray-700 p-2">
-              
-              {/* Status / Player Name - ADDED truncate */}
-              <p className="text-xs text-gray-400 mb-1 truncate">Waiting for George</p>
-              
-              {/* Chips Label - ADDED truncate */}
-              <p className="text-lg font-bold text-white mb-1 truncate">Your Chips</p>
-              
-              {/* Chips Value */}
-              <p className="text-xl text-yellow-400 mb-2">$4,900</p>
-              
-              {/* Current Bet Section */}
-              <div className="mt-2 pt-2 border-t border-gray-700">
-                {/* Current Bet Label - ADDED truncate */}
-                <p className="text-xs text-gray-400 truncate">Current Bet</p>
-                <p className="text-lg font-semibold text-white">$0</p>
+            {isPlayer && myPlayer && (
+              <div className="bg-gray-800 rounded-lg border border-gray-700 p-2">
+                
+                {/* Status / Player Name */}
+                <p className="text-xs text-gray-400 mb-1 truncate">
+                  {isMyTurn ? (
+                    <span className="text-green-400 font-semibold">Your Turn</span>
+                  ) : (
+                    `Waiting for ${currentPlayer?.username || 'other player'}`
+                  )}
+                </p>
+                
+                {/* Chips Label */}
+                <p className="text-lg font-bold text-white mb-1 truncate">Your Chips</p>
+                
+                {/* Chips Value */}
+                <p className="text-xl text-yellow-400 mb-2">{formatCurrency(myPlayer.chips)}</p>
+                
+                {/* Current Bet Section */}
+                <div className="mt-2 pt-2 border-t border-gray-700">
+                  <p className="text-xs text-gray-400 truncate">Current Bet</p>
+                  <p className="text-lg font-semibold text-white">{formatCurrency(myPlayer.currentBet || 0)}</p>
+                </div>
+                
               </div>
-              
-            </div>
+            )}
 
             {/* NEW: Action Buttons - REDESIGNED */}
             {isPlayer && 
@@ -1117,54 +1124,36 @@ useEffect(() => {
               table.gamePhase !== 'finished' && 
               table.gamePhase !== 'showdown' &&
               table.gamePhase !== 'showdown' && ( 
-                <div className="mt-6">
+                <div className="mt-11">
                 {/* Player Status Card with Buttons on One Line */}
-                <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-4 border border-gray-700 shadow-xl">
-                  <div className="flex flex-col gap-4">
-                    {/* Left side - Status and Stats */}
-                    <div className="flex items-center gap-6 flex-1">
-                      <div className="text-white text-base font-semibold">
+                <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-3 border border-gray-700 shadow-xl">
+                  <div className="flex flex-col gap-3">
+                    {/* Status and Stats - Stacked */}
+                    <div className="flex flex-col gap-2">
+                      {/* Turn Status */}
+                      <div className="text-white text-sm font-semibold">
                         {isMyTurn ? (
-                          <span className="flex items-center whitespace-nowrap">
-                            <span className="w-3 h-3 bg-green-400 rounded-full mr-2 animate-pulse"></span>
+                          <span className="flex items-center">
+                            <span className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></span>
                             <span className="text-green-400">Your Turn</span>
                           </span>
                         ) : (
-                          <span className="flex items-center whitespace-nowrap">
-                            <span className="w-3 h-3 bg-gray-500 rounded-full mr-2"></span>
-                            <span className="text-gray-400">Waiting for {currentPlayer?.username || 'other player'}</span>
+                          <span className="flex items-center">
+                            <span className="w-2 h-2 bg-gray-500 rounded-full mr-2"></span>
+                            <span className="text-gray-400 truncate">Waiting for {currentPlayer?.username || 'player'}</span>
                           </span>
                         )}
                       </div>
-                      
-                      {myPlayer && (
-                        <div className="flex gap-3 text-sm">
-                          <div className="bg-gray-900 rounded-lg px-3 py-2 border border-gray-700">
-                            <div className="text-gray-400 text-xs">Your Chips</div>
-                            <div className="text-poker-gold font-bold whitespace-nowrap">{formatCurrency(myPlayer.chips)}</div>
-                          </div>
-                          <div className="bg-gray-900 rounded-lg px-3 py-2 border border-gray-700">
-                            <div className="text-gray-400 text-xs">Current Bet</div>
-                            <div className="text-white font-bold whitespace-nowrap">{formatCurrency(myPlayer.currentBet || 0)}</div>
-                          </div>
-                          {callAmount > 0 && (
-                            <div className="bg-gray-900 rounded-lg px-3 py-2 border border-yellow-700">
-                              <div className="text-gray-400 text-xs">To Call</div>
-                              <div className="text-yellow-400 font-bold whitespace-nowrap">{formatCurrency(callAmount)}</div>
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
 
-                    {/* Action Buttons Row */}
+                    {/* Action Buttons - Wrapped */}
                     {isMyTurn && (
-                      <div className="flex gap-2 w-full">
+                      <div className="flex flex-wrap gap-2 w-full">
                         <Button
                           onClick={handleFold}
                           disabled={isActionLoading || (waitingForStateUpdate && String(user?.id) === lastActionPlayerId)}
                           variant="secondary"
-                          className="bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-red-500"
+                          className="bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 flex-1 min-w-[70px] py-2 text-xs font-semibold shadow-lg border-2 border-red-500"
                         >
                           {isActionLoading ? '...' : 'Fold'}
                         </Button>
@@ -1176,7 +1165,7 @@ useEffect(() => {
                                 onClick={handleCheck}
                                 disabled={isActionLoading || (waitingForStateUpdate && String(user?.id) === lastActionPlayerId)}
                                 variant="secondary"
-                                className="bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-blue-500"
+                                className="bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 flex-1 min-w-[70px] py-2 text-xs font-semibold shadow-lg border-2 border-blue-500"
                               >
                                 {isActionLoading ? '...' : 'Check'}
                               </Button>
@@ -1206,7 +1195,7 @@ useEffect(() => {
                                 setShowRaiseModal(true);
                               }}
                               disabled={isActionLoading || (myPlayer?.chips || 0) <= callAmount}
-                              className="bg-gradient-to-br from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-orange-500"
+                              className="bg-gradient-to-br from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 flex-1 min-w-[70px] py-2 text-xs font-semibold shadow-lg border-2 border-orange-500"
                             >
                               Raise
                             </Button>
@@ -1217,7 +1206,7 @@ useEffect(() => {
                               onClick={handleCheck}
                               disabled={isActionLoading || (waitingForStateUpdate && String(user?.id) === lastActionPlayerId)}
                               variant="secondary"
-                              className="bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-blue-500"
+                              className="bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 flex-1 min-w-[70px] py-2 text-xs font-semibold shadow-lg border-2 border-blue-500"
                             >
                               {isActionLoading ? '...' : 'Check'}
                             </Button>
@@ -1228,7 +1217,7 @@ useEffect(() => {
                                 setShowRaiseModal(true);
                               }}
                               disabled={isActionLoading || (myPlayer?.chips || 0) === 0}
-                              className="bg-gradient-to-br from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-orange-500"
+                              className="bg-gradient-to-br from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 flex-1 min-w-[70px] py-2 text-xs font-semibold shadow-lg border-2 border-orange-500"
                             >
                               Bet
                             </Button>
