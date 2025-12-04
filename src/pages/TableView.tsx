@@ -613,34 +613,34 @@ useEffect(() => {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       {/* Header */}
       <header className="bg-gray-900 border-b-2 border-poker-gold shadow-lg">
-        <nav className="flex justify-between items-center max-w-7xl mx-auto px-6 py-4">
+        <nav className="flex flex-col sm:flex-row justify-between items-center max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 gap-2 sm:gap-0">
           <button
             onClick={() => navigate('/dashboard')}
-            className="flex items-center text-gray-400 hover:text-white transition-colors"
+            className="flex items-center text-gray-400 hover:text-white transition-colors text-sm sm:text-base"
           >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back to Dashboard
+            Back
           </button>
           
           <div className="text-center">
-            <div className="text-2xl font-bold bg-gradient-to-r from-poker-gold to-yellow-400 bg-clip-text text-transparent">
+            <div className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-poker-gold to-yellow-400 bg-clip-text text-transparent">
               {table.name}
             </div>
-            <div className="text-sm text-gray-400 capitalize">
-              {table.gameType.replace('-', ' ')} • {table.players.length}/{table.maxPlayers} Players
+            <div className="text-xs sm:text-sm text-gray-400 capitalize">
+              {table.gameType.replace('-', ' ')} • {table.players.length}/{table.maxPlayers}
             </div>
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             {isPlayer && (
               <Button
                 onClick={handleLeaveTable}
                 variant="secondary"
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-red-600 hover:bg-red-700 text-xs sm:text-base py-1 sm:py-2 px-2 sm:px-4"
               >
-                Leave Table
+                Leave
               </Button>
             )}
           </div>
@@ -666,31 +666,49 @@ useEffect(() => {
 
       {/* Main Table Area */}
       {/* Main Table Area */}
-      <main className="w-full px-6 pt-8 pb-4">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <main className="w-full px-2 sm:px-6 pt-4 sm:pt-8 pb-2 sm:pb-4">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 sm:gap-6">
           {/* Poker Table */}
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-4">
             {/* Poker Table - REDESIGNED */}
-            <div className="relative bg-gray-900 rounded-full aspect-[5/2.8] shadow-2xl overflow-visible mb-6">
-              {/* Outer rail */}
-              <div className="absolute inset-0 rounded-full border-[16px] border-yellow-700 shadow-inner">
-                {/* Inner rail with gradient */}
-                <div className="absolute inset-0 rounded-full border-[8px] border-yellow-600 shadow-lg">
-                  {/* Felt surface */}
-                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-green-700 via-green-800 to-green-900 shadow-inner">
-                    {/* Felt texture overlay */}
-                    <div 
-                      className="absolute inset-0 rounded-full opacity-20"
-                      style={{
-                        backgroundImage: `repeating-linear-gradient(
-                          45deg,
-                          transparent,
-                          transparent 2px,
-                          rgba(0,0,0,0.1) 2px,
-                          rgba(0,0,0,0.1) 4px
-                        )`
-                      }}
-                    />
+              <div className="relative bg-gray-900 rounded-full aspect-[5/2.7] sm:aspect-[5/2.7] overflow-visible mb-4 sm:mb-6" style={{
+                boxShadow: '0 40px 80px -18px rgba(0, 0, 0, 0.9), 0 0 100px rgba(212, 175, 55, 0.2)'
+              }}>
+                
+                {/* Outer rail (Wood simulation) */}
+                  <div className="absolute inset-0 rounded-full border-[16px] shadow-inner" style={{
+                    borderColor: '#8B7355',
+                    boxShadow: 'inset 0 10px 20px rgba(0,0,0,0.6), inset 0 -10px 20px rgba(255,255,255,0.15)'
+                  }}>
+                    
+                    {/* Inner rail (Darker wood simulation) */}
+                      <div className="absolute inset-0 rounded-full" style={{
+                        // You can slightly adjust the colors if needed, but the current gradient is dark wood
+                        background: 'linear-gradient(135deg, #6B5844 0%, #5A4936 50%, #4A3D2E 100%)',
+                        boxShadow: 'inset 0 6px 10px rgba(255,255,255,0.2), inset 0 -6px 10px rgba(0,0,0,0.7), 0 0 20px rgba(0,0,0,0.5)'
+                      }}>
+                    
+                      {/* Felt surface */}
+                      <div className="absolute inset-0 rounded-full bg-gradient-to-br from-green-700 via-green-800 to-green-900" style={{
+                        boxShadow: 'inset 0 0 80px rgba(0,0,0,0.8), inset 0 0 150px rgba(0,0,0,0.3)'
+                      }}>
+                        
+                        {/* Felt texture overlay - Modified */}
+                        <div 
+                          className="absolute inset-0 rounded-full opacity-20"
+                          style={{
+                            backgroundImage: `
+                              repeating-linear-gradient(
+                                45deg,
+                                transparent,
+                                transparent 2px,
+                                rgba(0,0,0,0.1) 2px,
+                                rgba(0,0,0,0.1) 4px
+                              ),
+                              radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.05) 0%, rgba(0, 0, 0, 0.2) 100%)
+                            `
+                          }}
+                        />
 
                     {/* =========== ENHANCED PLAYER SEATS WITH INTEGRATED CARDS =========== */}
                     {table.players.map((player) => {
@@ -711,13 +729,13 @@ useEffect(() => {
                           className="absolute transform -translate-x-1/2 -translate-y-1/2 z-20"
                         >
                           <div 
-                            className={`flex flex-col items-center p-4 rounded-xl bg-gray-800 shadow-2xl 
-                                        border-2 transition-all duration-300 ${
-                                          isActive ? 'border-green-400 scale-105 shadow-green-400/50' : 'border-gray-700'
-                                        } ${
-                                          hasCards ? 'w-80' : 'w-44'
-                                        }`}
-                          >
+                              className={`flex flex-col items-center p-2 sm:p-4 rounded-xl bg-gray-800 shadow-2xl 
+                                          border-2 transition-all duration-300 ${
+                                            isActive ? 'border-green-400 scale-105 shadow-green-400/50' : 'border-gray-700'
+                                          } ${
+                                            hasCards ? 'w-64 sm:w-80' : 'w-32 sm:w-44'
+                                          }`}
+                            >
                             <div className="flex items-center gap-1 w-full">
                               {/* Avatar - LARGER (16 -> 20) */}
                               <div className="relative flex-shrink-0">
@@ -728,7 +746,7 @@ useEffect(() => {
                                     className="w-20 h-20 rounded-full object-cover border-3 border-white shadow-lg" 
                                   />
                                 ) : (
-                                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-poker-gold to-yellow-600 flex items-center justify-center border-3 border-white shadow-lg">
+                                  <div className="w-12 h-12 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-poker-gold to-yellow-600 flex items-center justify-center border-3 border-white shadow-lg">
                                     <span className="text-gray-900 font-bold text-2xl">
                                       {player.username.charAt(0).toUpperCase()}
                                     </span>
@@ -749,11 +767,11 @@ useEffect(() => {
                               </div>
                               
                               {/* Name and Stack */}
-                              <div className="flex-1 min-w-[100px]">
-                                <div className={`text-base font-bold ${isMyPlayer ? 'text-poker-gold' : 'text-white'}`}>
+                              <div className="flex-1 min-w-[60px] sm:min-w-[100px]">
+                                <div className={`text-xs sm:text-base font-bold ${isMyPlayer ? 'text-poker-gold' : 'text-white'}`}>
                                   {player.username}
                                 </div>
-                                <div className="text-sm text-gray-300 font-semibold">
+                                <div className="text-xs sm:text-sm text-gray-300 font-semibold">
                                   {formatCurrency(player.chips)}
                                 </div>
                               </div>
@@ -826,26 +844,26 @@ useEffect(() => {
 
                     {/* Community Cards Area */}
                     <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
-                      <div className="text-center mb-2">
+                      <div className="text-center mb-4">
                         {table.currentPot > 0 && (
-                          <div className="text-poker-gold font-bold text-xl mb-1 drop-shadow-lg">
+                          <div className="text-poker-gold font-bold text-3xl mb-2 drop-shadow-lg">
                             Pot: {formatCurrency(table.currentPot)}
                           </div>
                         )}
-                        <div className="text-white font-semibold text-sm capitalize drop-shadow-md">
+                        <div className="text-white font-semibold text-lg capitalize drop-shadow-md">
                           {table.gamePhase}
                         </div>
                       </div>
                       
                       {/* Community Cards */}
-                      <div className="flex justify-center space-x-2">
+                      <div className="flex justify-center space-x-3">
                         {table.communityCards && table.communityCards.length > 0 ? (
                           table.communityCards.map((card, index) => (
                             <img
                               key={index}
                               src={`/cards/${card}.svg`}
                               alt={card}
-                              className="w-12 h-16 rounded border-2 border-gray-300 shadow-lg"
+                              className="w-16 h-24 rounded shadow-lg"
                             />
                           ))
                         ) : null}
@@ -853,42 +871,7 @@ useEffect(() => {
                         {Array.from({ length: 5 - (table.communityCards?.length || 0) }).map((_, index) => (
                           <div
                             key={`placeholder-${index}`}
-                            className="w-12 h-16 bg-gray-600 rounded border-2 border-gray-500 opacity-30"
-                          />
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Community Cards Area */}
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
-                      <div className="text-center mb-2">
-                        {table.currentPot > 0 && (
-                          <div className="text-poker-gold font-bold text-xl mb-1 drop-shadow-lg">
-                            Pot: {formatCurrency(table.currentPot)}
-                          </div>
-                        )}
-                        <div className="text-white font-semibold text-sm capitalize drop-shadow-md">
-                          {table.gamePhase}
-                        </div>
-                      </div>
-                      
-                      {/* Community Cards */}
-                      <div className="flex justify-center space-x-2">
-                        {table.communityCards && table.communityCards.length > 0 ? (
-                          table.communityCards.map((card, index) => (
-                            <img
-                              key={index}
-                              src={`/cards/${card}.svg`}
-                              alt={card}
-                              className="w-12 h-16 rounded border-2 border-gray-300 shadow-lg"
-                            />
-                          ))
-                        ) : null}
-
-                        {Array.from({ length: 5 - (table.communityCards?.length || 0) }).map((_, index) => (
-                          <div
-                            key={`placeholder-${index}`}
-                            className="w-12 h-16 bg-gray-600 rounded border-2 border-gray-500 opacity-30"
+                            className="w-16 h-24 bg-gray-600 rounded border-2 border-gray-500 opacity-30"
                           />
                         ))}
                       </div>
@@ -971,142 +954,6 @@ useEffect(() => {
               </div>
             </div>
 
-            {/* NEW: Action Buttons - REDESIGNED */}
-            {isPlayer && 
-              table.status === 'active' && 
-              table.gamePhase !== 'finished' && 
-              table.gamePhase !== 'showdown' &&
-              table.gamePhase !== 'showdown' && ( 
-                <div className="mt-6">
-                {/* Player Status Card with Buttons on One Line */}
-                <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-4 border border-gray-700 shadow-xl">
-                  <div className="flex items-center justify-between gap-6">
-                    {/* Left side - Status and Stats */}
-                    <div className="flex items-center gap-6 flex-1">
-                      <div className="text-white text-base font-semibold">
-                        {isMyTurn ? (
-                          <span className="flex items-center whitespace-nowrap">
-                            <span className="w-3 h-3 bg-green-400 rounded-full mr-2 animate-pulse"></span>
-                            <span className="text-green-400">Your Turn</span>
-                          </span>
-                        ) : (
-                          <span className="flex items-center whitespace-nowrap">
-                            <span className="w-3 h-3 bg-gray-500 rounded-full mr-2"></span>
-                            <span className="text-gray-400">Waiting for {currentPlayer?.username || 'other player'}</span>
-                          </span>
-                        )}
-                      </div>
-                      
-                      {myPlayer && (
-                        <div className="flex gap-3 text-sm">
-                          <div className="bg-gray-900 rounded-lg px-3 py-2 border border-gray-700">
-                            <div className="text-gray-400 text-xs">Your Chips</div>
-                            <div className="text-poker-gold font-bold whitespace-nowrap">{formatCurrency(myPlayer.chips)}</div>
-                          </div>
-                          <div className="bg-gray-900 rounded-lg px-3 py-2 border border-gray-700">
-                            <div className="text-gray-400 text-xs">Current Bet</div>
-                            <div className="text-white font-bold whitespace-nowrap">{formatCurrency(myPlayer.currentBet || 0)}</div>
-                          </div>
-                          {callAmount > 0 && (
-                            <div className="bg-gray-900 rounded-lg px-3 py-2 border border-yellow-700">
-                              <div className="text-gray-400 text-xs">To Call</div>
-                              <div className="text-yellow-400 font-bold whitespace-nowrap">{formatCurrency(callAmount)}</div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Right side - Action Buttons */}
-                    {isMyTurn && (
-                      <div className="flex gap-2 flex-shrink-0">
-                        <Button
-                          onClick={handleFold}
-                          disabled={isActionLoading || (waitingForStateUpdate && String(user?.id) === lastActionPlayerId)}
-                          variant="secondary"
-                          className="bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-red-500"
-                        >
-                          {isActionLoading ? '...' : 'Fold'}
-                        </Button>
-                        
-                        {isFacingBet ? (
-                          <>
-                            {callAmount === 0 ? (
-                              <Button
-                                onClick={handleCheck}
-                                disabled={isActionLoading || (waitingForStateUpdate && String(user?.id) === lastActionPlayerId)}
-                                variant="secondary"
-                                className="bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-blue-500"
-                              >
-                                {isActionLoading ? '...' : 'Check'}
-                              </Button>
-                            ) : (
-                              <Button
-                                onClick={handleCall}
-                                disabled={isActionLoading || (waitingForStateUpdate && String(user?.id) === lastActionPlayerId)}
-                                className="bg-gradient-to-br from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 min-w-24 py-2 text-sm font-semibold shadow-lg border-2 border-green-500"
-                              >
-                                {isActionLoading ? '...' : 
-                                  callAmount >= (myPlayer?.chips || 0)
-                                    ? `All-In ${formatCurrency(myPlayer?.chips || 0)}`
-                                    : `Call ${formatCurrency(callAmount)}`
-                                }
-                              </Button>
-                            )}
-                            
-                            <Button
-                              onClick={() => {
-                                const currentBetNow = table.players.reduce((max, p) => Math.max(max, p.currentBet || 0), 0);
-                                const minRaiseIncrementNow = (table.lastRaiseAmount && table.lastRaiseAmount > 0) 
-                                  ? table.lastRaiseAmount 
-                                  : table.bigBlind;
-                                const minRaiseNow = currentBetNow + minRaiseIncrementNow;
-                                
-                                setRaiseAmount(minRaiseNow);
-                                setShowRaiseModal(true);
-                              }}
-                              disabled={isActionLoading || (myPlayer?.chips || 0) <= callAmount}
-                              className="bg-gradient-to-br from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-orange-500"
-                            >
-                              Raise
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              onClick={handleCheck}
-                              disabled={isActionLoading || (waitingForStateUpdate && String(user?.id) === lastActionPlayerId)}
-                              variant="secondary"
-                              className="bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-blue-500"
-                            >
-                              {isActionLoading ? '...' : 'Check'}
-                            </Button>
-                            
-                            <Button
-                              onClick={() => {
-                                setRaiseAmount(table.bigBlind);
-                                setShowRaiseModal(true);
-                              }}
-                              disabled={isActionLoading || (myPlayer?.chips || 0) === 0}
-                              className="bg-gradient-to-br from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-orange-500"
-                            >
-                              Bet
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                {/* Message shown when NOT your turn */}
-                {!isMyTurn && (
-                  <div className="text-center text-gray-400 py-3 bg-gray-800 rounded-xl border border-gray-700 mt-3">
-                    Wait for your turn to act
-                  </div>
-                )}
-              </div>
-            )}
             
             {/* Bet/Raise Modal */}
           {showRaiseModal && (() => {
@@ -1244,35 +1091,155 @@ useEffect(() => {
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
             {/* Table Info */}
-            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Table Info</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Game Type:</span>
-                  <span className="text-white capitalize">{table.gameType.replace('-', ' ')}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Blinds:</span>
-                  <span className="text-white">${table.smallBlind}/{table.bigBlind}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Buy-in:</span>
-                  <span className="text-white">
-                    {formatCurrency(table.buyInMin)} - {formatCurrency(table.buyInMax)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Status:</span>
-                  <span className={`capitalize ${
-                    table.status === 'active' ? 'text-green-400' :
-                    table.status === 'waiting' ? 'text-yellow-400' :
-                    'text-red-400'
-                  }`}>
-                    {table.status}
-                  </span>
-                </div>
+             <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
+              <div className="text-xs text-gray-400 mb-2">
+                <span className="capitalize">{table.gameType.replace('-', ' ')}</span> • ${table.smallBlind}/{table.bigBlind}
+              </div>
+              <div className={`text-center py-1.5 rounded text-sm font-semibold ${
+                isPlayer ? 'bg-green-900 text-green-200' :
+                isSpectator ? 'bg-blue-900 text-blue-200' :
+                'bg-gray-900 text-gray-300'
+              }`}>
+                {isPlayer ? 'Player' : isSpectator ? 'Spectator' : 'Observer'}
               </div>
             </div>
+
+            {/* NEW: Action Buttons - REDESIGNED */}
+            {isPlayer && 
+              table.status === 'active' && 
+              table.gamePhase !== 'finished' && 
+              table.gamePhase !== 'showdown' &&
+              table.gamePhase !== 'showdown' && ( 
+                <div className="mt-6">
+                {/* Player Status Card with Buttons on One Line */}
+                <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-4 border border-gray-700 shadow-xl">
+                  <div className="flex flex-col gap-4">
+                    {/* Left side - Status and Stats */}
+                    <div className="flex items-center gap-6 flex-1">
+                      <div className="text-white text-base font-semibold">
+                        {isMyTurn ? (
+                          <span className="flex items-center whitespace-nowrap">
+                            <span className="w-3 h-3 bg-green-400 rounded-full mr-2 animate-pulse"></span>
+                            <span className="text-green-400">Your Turn</span>
+                          </span>
+                        ) : (
+                          <span className="flex items-center whitespace-nowrap">
+                            <span className="w-3 h-3 bg-gray-500 rounded-full mr-2"></span>
+                            <span className="text-gray-400">Waiting for {currentPlayer?.username || 'other player'}</span>
+                          </span>
+                        )}
+                      </div>
+                      
+                      {myPlayer && (
+                        <div className="flex gap-3 text-sm">
+                          <div className="bg-gray-900 rounded-lg px-3 py-2 border border-gray-700">
+                            <div className="text-gray-400 text-xs">Your Chips</div>
+                            <div className="text-poker-gold font-bold whitespace-nowrap">{formatCurrency(myPlayer.chips)}</div>
+                          </div>
+                          <div className="bg-gray-900 rounded-lg px-3 py-2 border border-gray-700">
+                            <div className="text-gray-400 text-xs">Current Bet</div>
+                            <div className="text-white font-bold whitespace-nowrap">{formatCurrency(myPlayer.currentBet || 0)}</div>
+                          </div>
+                          {callAmount > 0 && (
+                            <div className="bg-gray-900 rounded-lg px-3 py-2 border border-yellow-700">
+                              <div className="text-gray-400 text-xs">To Call</div>
+                              <div className="text-yellow-400 font-bold whitespace-nowrap">{formatCurrency(callAmount)}</div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Action Buttons Row */}
+                    {isMyTurn && (
+                      <div className="flex gap-2 w-full">
+                        <Button
+                          onClick={handleFold}
+                          disabled={isActionLoading || (waitingForStateUpdate && String(user?.id) === lastActionPlayerId)}
+                          variant="secondary"
+                          className="bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-red-500"
+                        >
+                          {isActionLoading ? '...' : 'Fold'}
+                        </Button>
+                        
+                        {isFacingBet ? (
+                          <>
+                            {callAmount === 0 ? (
+                              <Button
+                                onClick={handleCheck}
+                                disabled={isActionLoading || (waitingForStateUpdate && String(user?.id) === lastActionPlayerId)}
+                                variant="secondary"
+                                className="bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-blue-500"
+                              >
+                                {isActionLoading ? '...' : 'Check'}
+                              </Button>
+                            ) : (
+                              <Button
+                                onClick={handleCall}
+                                disabled={isActionLoading || (waitingForStateUpdate && String(user?.id) === lastActionPlayerId)}
+                                className="bg-gradient-to-br from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 min-w-24 py-2 text-sm font-semibold shadow-lg border-2 border-green-500"
+                              >
+                                {isActionLoading ? '...' : 
+                                  callAmount >= (myPlayer?.chips || 0)
+                                    ? `All-In ${formatCurrency(myPlayer?.chips || 0)}`
+                                    : `Call ${formatCurrency(callAmount)}`
+                                }
+                              </Button>
+                            )}
+                            
+                            <Button
+                              onClick={() => {
+                                const currentBetNow = table.players.reduce((max, p) => Math.max(max, p.currentBet || 0), 0);
+                                const minRaiseIncrementNow = (table.lastRaiseAmount && table.lastRaiseAmount > 0) 
+                                  ? table.lastRaiseAmount 
+                                  : table.bigBlind;
+                                const minRaiseNow = currentBetNow + minRaiseIncrementNow;
+                                
+                                setRaiseAmount(minRaiseNow);
+                                setShowRaiseModal(true);
+                              }}
+                              disabled={isActionLoading || (myPlayer?.chips || 0) <= callAmount}
+                              className="bg-gradient-to-br from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-orange-500"
+                            >
+                              Raise
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              onClick={handleCheck}
+                              disabled={isActionLoading || (waitingForStateUpdate && String(user?.id) === lastActionPlayerId)}
+                              variant="secondary"
+                              className="bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-blue-500"
+                            >
+                              {isActionLoading ? '...' : 'Check'}
+                            </Button>
+                            
+                            <Button
+                              onClick={() => {
+                                setRaiseAmount(table.bigBlind);
+                                setShowRaiseModal(true);
+                              }}
+                              disabled={isActionLoading || (myPlayer?.chips || 0) === 0}
+                              className="bg-gradient-to-br from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 min-w-20 py-2 text-sm font-semibold shadow-lg border-2 border-orange-500"
+                            >
+                              Bet
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Message shown when NOT your turn */}
+                {!isMyTurn && (
+                  <div className="text-center text-gray-400 py-3 bg-gray-800 rounded-xl border border-gray-700 mt-3">
+                    Wait for your turn to act
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Join as Player Button */}
             {canJoinAsPlayer && (
@@ -1285,7 +1252,7 @@ useEffect(() => {
             )}
 
             {/* Role Status */}
-            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+            {/* <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
               <h3 className="text-lg font-semibold text-white mb-2">Your Status</h3>
               <div className={`text-center py-2 rounded font-semibold ${
                 isPlayer ? 'bg-green-900 text-green-200' :
@@ -1294,31 +1261,31 @@ useEffect(() => {
               }`}>
                 {isPlayer ? 'Player' : isSpectator ? 'Spectator' : 'Observer'}
               </div>
-            </div>
+            </div> */}
 
             {/* Game Events Log */}
-<div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-  <h3 className="text-lg font-semibold text-white mb-4">Game Events</h3>
-  <div className="space-y-2 max-h-80 overflow-y-auto">
-    {gameEvents.length > 0 ? (
-      gameEvents.slice().reverse().map((event, index) => (
-        <div
-          key={index}
-          className={`p-2 rounded text-sm ${
-            event.type === 'separator' ? 'bg-gray-700 border-t-2 border-poker-gold text-center' :
-            event.type === 'win' ? 'bg-gradient-to-r from-yellow-900 to-green-900 border-2 border-poker-gold' :
-            event.type === 'bet' ? 'bg-orange-900' :
-            event.type === 'fold' ? 'bg-red-900' :
-            'bg-gray-900'
-          }`}
-        >
-          <div className={`${
-            event.type === 'separator' ? 'text-poker-gold font-bold' : 
-            event.type === 'win' ? 'text-yellow-200 font-bold text-base' :
-            'text-white'
-          }`}>
-            {event.type === 'win' && '🏆 '}{event.message}
-          </div>
+            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+              <h3 className="text-lg font-semibold text-white mb-4">Game Events</h3>
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {gameEvents.length > 0 ? (
+                  gameEvents.slice().reverse().map((event, index) => (
+                    <div
+                      key={index}
+                      className={`p-2 rounded text-sm ${
+                        event.type === 'separator' ? 'bg-gray-700 border-t-2 border-poker-gold text-center' :
+                        event.type === 'win' ? 'bg-gradient-to-r from-yellow-900 to-green-900 border-2 border-poker-gold' :
+                        event.type === 'bet' ? 'bg-orange-900' :
+                        event.type === 'fold' ? 'bg-red-900' :
+                        'bg-gray-900'
+                      }`}
+                    >
+                      <div className={`${
+                        event.type === 'separator' ? 'text-poker-gold font-bold' : 
+                        event.type === 'win' ? 'text-yellow-200 font-bold text-base' :
+                        'text-white'
+                      }`}>
+                        {event.type === 'win' && '🏆 '}{event.message}
+                      </div>
                       {event.type !== 'separator' && (
                         <div className="text-xs text-gray-400 mt-1">
                           {new Date(event.timestamp).toLocaleTimeString()}
