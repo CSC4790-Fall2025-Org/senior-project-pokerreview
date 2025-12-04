@@ -1091,17 +1091,24 @@ useEffect(() => {
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
             {/* Table Info */}
-             <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-              <div className="text-xs text-gray-400 mb-2">
-                <span className="capitalize">{table.gameType.replace('-', ' ')}</span> • ${table.smallBlind}/{table.bigBlind}
+             <div className="bg-gray-800 rounded-lg border border-gray-700 p-2">
+              
+              {/* Status / Player Name - ADDED truncate */}
+              <p className="text-xs text-gray-400 mb-1 truncate">Waiting for George</p>
+              
+              {/* Chips Label - ADDED truncate */}
+              <p className="text-lg font-bold text-white mb-1 truncate">Your Chips</p>
+              
+              {/* Chips Value */}
+              <p className="text-xl text-yellow-400 mb-2">$4,900</p>
+              
+              {/* Current Bet Section */}
+              <div className="mt-2 pt-2 border-t border-gray-700">
+                {/* Current Bet Label - ADDED truncate */}
+                <p className="text-xs text-gray-400 truncate">Current Bet</p>
+                <p className="text-lg font-semibold text-white">$0</p>
               </div>
-              <div className={`text-center py-1.5 rounded text-sm font-semibold ${
-                isPlayer ? 'bg-green-900 text-green-200' :
-                isSpectator ? 'bg-blue-900 text-blue-200' :
-                'bg-gray-900 text-gray-300'
-              }`}>
-                {isPlayer ? 'Player' : isSpectator ? 'Spectator' : 'Observer'}
-              </div>
+              
             </div>
 
             {/* NEW: Action Buttons - REDESIGNED */}
